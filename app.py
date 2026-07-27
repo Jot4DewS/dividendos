@@ -7,7 +7,7 @@ import plotly.express as px
 import streamlit as st
 import yfinance as yf
 
-# Configuração da página (com menu lateral aberto por padrão)
+# Configuração da página
 st.set_page_config(
     page_title="Meus Dividendos", 
     page_icon="💰", 
@@ -75,7 +75,7 @@ TEXTS = {
         "yes_clear": "✔️ Sim, Apagar Tudo",
         "cancel": "❌ Cancelar",
         "portfolio_cleared": "Carteira limpa com sucesso!",
-        "add_stock_info": "Adiciona uma ação acima ou importa um CSV para veres os teus dividendos.",
+        "add_stock_info": "Adiciona uma ação ou importa um CSV para veres os teus dividendos.",
         "will_receive": "Vais receber",
         "confirm_delete_stock_q": "Apagar **{}** da conta **{}**?",
         "yes": "Sim",
@@ -83,8 +83,7 @@ TEXTS = {
         "import_csv_title": "📥 Importar CSV",
         "upload_csv": "Carregar ficheiro CSV:",
         "import_btn": "Importar Ações",
-        "csv_success": "Importadas/Atualizadas {} ações na conta '{}'!",
-        "collapse_sidebar": "⬅️ Minimizar Menu"
+        "csv_success": "Importadas/Atualizadas {} ações na conta '{}'!"
     },
     "EN": {
         "title": "💰 My Dividends",
@@ -142,7 +141,7 @@ TEXTS = {
         "yes_clear": "✔️ Yes, Clear All",
         "cancel": "❌ Cancel",
         "portfolio_cleared": "Portfolio cleared successfully!",
-        "add_stock_info": "Add a stock above or import a CSV to see your dividends.",
+        "add_stock_info": "Add a stock or import a CSV to see your dividends.",
         "will_receive": "Will receive",
         "confirm_delete_stock_q": "Delete **{}** from account **{}**?",
         "yes": "Yes",
@@ -150,8 +149,7 @@ TEXTS = {
         "import_csv_title": "📥 Import CSV",
         "upload_csv": "Upload CSV file:",
         "import_btn": "Import Stocks",
-        "csv_success": "Imported/Updated {} stocks in account '{}'!",
-        "collapse_sidebar": "⬅️ Collapse Menu"
+        "csv_success": "Imported/Updated {} stocks in account '{}'!"
     }
 }
 
@@ -235,6 +233,40 @@ if not st.session_state.autenticado:
 else:
     user = st.session_state.user_atual
     user_data = dados_globais["users"][user]
+
+    # --- DIÁLOGO (POP-UP) PARA ADICIONAR AÇÃO ---
+    @st.dialog(t["add_stock"])
+    def modal_adicionar_acao():
+        with st.form("add_stock_modal_form", clear_on_submit=True):
+            conta_selecionada = st.selectbox(t["choose_account"], user_data["contas"])
+            ticker_input = st.text_input(t["ticker_label"]).upper().strip()
+            qtd = st.number_input(t["quantity_label"], min_value=0.0001, step=0.1, value=1.0, format="%.4f")
+            
+            submitted = st.form_submit_button(t["save_stock"], use_container_width=True)
+
+            if submitted and ticker_input:
+                if len(ticker_input) >= 5 and ticker_input[-1].isdigit() and not ticker_input.endswith(".SA"):
+                    ticker_final = f"{ticker_input}.SA"
+                else:
+                    ticker_final = ticker_input
+
+                encontrado = False
+                for item in user_data["carteira"]:
+                    if item["ticker"] == ticker_final and item["conta"] == conta_selecionada:
+                        item["quantidade"] += float(qtd)
+                        encontrado = True
+                        break
+
+                if not len(user_data["carteira"]) or not encontrado:
+                    user_data["carteira"].append({
+                        "conta": conta_selecionada,
+                        "ticker": ticker_final,
+                        "quantidade": float(qtd)
+                    })
+
+                guardar_dados(dados_globais)
+                st.success(t["stock_updated"].format(ticker_final, conta_selecionada))
+                st.rerun()
 
     # --- PROCESSAMENTO INICIAL DOS DADOS DA CARTEIRA ---
     hoje = datetime.date.today()
@@ -323,9 +355,7 @@ else:
                     df_csv = pd.read_csv(uploaded_file)
                     
                     compras_vendas = {}
-                    cols_lower = [c.lower() for c in df_csv.columns]
                     
-                    # Tenta identificar colunas dinamicamente
                     col_ticker = next((c for c in df_csv.columns if "ticker" in c.lower() or "symbol" in c.lower() or "ação" in c.lower()), None)
                     col_shares = next((c for c in df_csv.columns if "shares" in c.lower() or "qty" in c.lower() or "qtd" in c.lower() or "quantidade" in c.lower()), None)
                     col_action = next((c for c in df_csv.columns if "action" in c.lower() or "tipo" in c.lower() or "operação" in c.lower()), None)
@@ -345,7 +375,6 @@ else:
                             else:
                                 compras_vendas[tkr] = compras_vendas.get(tkr, 0.0) + shs
 
-                        # Atualizar carteira do utilizador
                         count_import = 0
                         for tkr, qty in compras_vendas.items():
                             if qty > 0:
@@ -445,46 +474,8 @@ else:
     # --- CONTEÚDO PRINCIPAL ---
     st.title(t["title"])
 
-    # SECÇÃO: Adicionar Ação
-    st.subheader(t["add_stock"])
-    with st.form("add_stock_form", clear_on_submit=True):
-        conta_selecionada = st.selectbox(t["choose_account"], user_data["contas"])
-        
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            ticker_input = st.text_input(t["ticker_label"]).upper().strip()
-        with col2:
-            qtd = st.number_input(t["quantity_label"], min_value=0.0001, step=0.1, value=1.0, format="%.4f")
-
-        submitted = st.form_submit_button(t["save_stock"])
-
-        if submitted and ticker_input:
-            if len(ticker_input) >= 5 and ticker_input[-1].isdigit() and not ticker_input.endswith(".SA"):
-                ticker_final = f"{ticker_input}.SA"
-            else:
-                ticker_final = ticker_input
-
-            encontrado = False
-            for item in user_data["carteira"]:
-                if item["ticker"] == ticker_final and item["conta"] == conta_selecionada:
-                    item["quantidade"] += float(qtd)
-                    encontrado = True
-                    break
-
-            if not len(user_data["carteira"]) or not encontrado:
-                user_data["carteira"].append({
-                    "conta": conta_selecionada,
-                    "ticker": ticker_final,
-                    "quantidade": float(qtd)
-                })
-
-            guardar_dados(dados_globais)
-            st.success(t["stock_updated"].format(ticker_final, conta_selecionada))
-            st.rerun()
-
     # SECÇÃO: Exibição da Carteira
     if dados_graficos_globais:
-        st.markdown("---")
         st.subheader(t["your_portfolio"].format(filtro_conta))
 
         if filtro_conta == t["all_accounts"]:
@@ -494,6 +485,8 @@ else:
 
         if not dados_filtrados:
             st.info(t["no_stocks_account"].format(filtro_conta))
+            if st.button(t["add_stock"], type="primary"):
+                modal_adicionar_acao()
         else:
             col_grafico, col_lista = st.columns([0.8, 1.2])
 
@@ -527,6 +520,10 @@ else:
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
+                # BOTÃO PARA ADICIONAR AÇÃO COLOCADO DEBAIXO DO GRÁFICO
+                if st.button(t["add_stock"], type="primary", use_container_width=True):
+                    modal_adicionar_acao()
+
             with col_lista:
                 for idx, acao in enumerate(dados_filtrados):
                     col_titulo, col_btn_del = st.columns([12, 1])
@@ -535,12 +532,10 @@ else:
                         st.markdown(f"### {acao['nome']} (`{acao['ticker']}`)")
                     
                     with col_btn_del:
-                        # BOTÃO PEQUENO COM "❌"
                         if st.button("❌", key=f"btn_x_{acao['ticker']}_{acao['conta']}_{idx}"):
                             st.session_state.stock_to_delete = f"{acao['ticker']}_{acao['conta']}"
                             st.rerun()
 
-                    # CAIXA DE CONFIRMAÇÃO SE FOI CLICADO NO "❌" DESTAS AÇÕES
                     if st.session_state.stock_to_delete == f"{acao['ticker']}_{acao['conta']}":
                         st.warning(t["confirm_delete_stock_q"].format(acao['ticker'], acao['conta']))
                         c_sim, c_nao = st.columns(2)
@@ -574,6 +569,7 @@ else:
 
                     st.markdown("---")
 
+        st.markdown("<br>", unsafe_allow_html=True)
         # Botão Limpar Carteira Toda
         if not st.session_state.confirmar_limpar_tudo:
             if st.button(t["clear_portfolio"]):
@@ -594,3 +590,5 @@ else:
                     st.rerun()
     else:
         st.info(t["add_stock_info"])
+        if st.button(t["add_stock"], type="primary"):
+            modal_adicionar_acao()
