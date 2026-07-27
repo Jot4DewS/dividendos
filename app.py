@@ -6,7 +6,7 @@ import streamlit as st
 import yfinance as yf
 
 # Configuração da página
-st.set_page_config(page_title="Meus Dividendos", page_icon="💰", layout="centered")
+st.set_page_config(page_title="Meus Dividendos", page_icon="💰", layout="wide")
 
 FICHEIRO_DADOS = "dados_app.json"
 
@@ -31,6 +31,8 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 if "user_atual" not in st.session_state:
     st.session_state.user_atual = None
+if "confirmar_limpar_tudo" not in st.session_state:
+    st.session_state.confirmar_limpar_tudo = False
 
 # --- ECRÃ DE LOGIN / REGISTO ---
 if not st.session_state.autenticado:
@@ -65,45 +67,64 @@ if not st.session_state.autenticado:
                 if not novo_user or not nova_pass:
                     st.warning("Preenche todos os campos!")
                 elif novo_user in dados_globais["users"]:
-                    st.error("Este utilizador já existe! Escolhe outro nome.")
+                    st.error("Este utilizador já existe!")
                 else:
-                    # Criar novo utilizador com carteira inicial
                     dados_globais["users"][novo_user] = {
                         "password": nova_pass,
                         "contas": ["Geral", "DEGIRO", "Revolut"],
                         "carteira": []
                     }
                     guardar_dados(dados_globais)
-                    st.success("Conta criada com sucesso! Já podes mudar para a opção 'Entrar (Login)'.")
+                    st.success("Conta criada com sucesso! Faz login.")
 
 # --- APLICAÇÃO PRINCIPAL ---
 else:
     user = st.session_state.user_atual
     user_data = dados_globais["users"][user]
 
-    # Menu Lateral
+    # --- MENU LATERAL (ESQUERDA) ---
+    st.sidebar.title("📌 Menu")
     st.sidebar.write(f"Utilizador: **{user}** 👋")
+    
     if st.sidebar.button("🚪 Sair / Logout"):
         st.session_state.autenticado = False
         st.session_state.user_atual = None
         st.rerun()
 
-    st.title("💰 Meus Dividendos")
+    st.sidebar.markdown("---")
+    
+    # 🏦 Gestão de Contas no Menu da Esquerda
+    st.sidebar.subheader("🏦 As tuas Contas")
+    filtro_conta = st.sidebar.selectbox("🔍 Filtrar Carteira:", ["Todas as Contas"] + user_data["contas"])
 
-    # --- SECÇÃO 1: Gestão de Contas ---
-    with st.expander("⚙️ Gerir Contas / Corretoras"):
-        nova_conta = st.text_input("Nome da Nova Conta (ex: Interactive Brokers):").strip()
-        if st.button("➕ Adicionar Conta"):
+    with st.sidebar.expander("⚙️ Criar / Apagar Conta"):
+        nova_conta = st.text_input("Nova Conta (ex: Trading212):").strip()
+        if st.button("➕ Adicionar"):
             if nova_conta and nova_conta not in user_data["contas"]:
                 user_data["contas"].append(nova_conta)
                 guardar_dados(dados_globais)
                 st.success(f"Conta '{nova_conta}' adicionada!")
                 st.rerun()
 
-    # --- SECÇÃO 2: Adicionar Ação ---
+        st.markdown("---")
+        conta_para_apagar = st.selectbox("Selecione para apagar:", ["-- Selecionar --"] + user_data["contas"])
+        if conta_para_apagar != "-- Selecionar --":
+            st.warning(f"Tem a certeza que quer apagar a conta '{conta_para_apagar}' e as suas ações?")
+            if st.button(f"⚠️ Confirmar Apagar '{conta_para_apagar}'"):
+                user_data["contas"].remove(conta_para_apagar)
+                # Remove ações associadas a essa conta
+                user_data["carteira"] = [item for item in user_data["carteira"] if item["conta"] != conta_para_apagar]
+                guardar_dados(dados_globais)
+                st.success("Conta apagada!")
+                st.rerun()
+
+    # --- CONTEÚDO PRINCIPAL (CENTRO) ---
+    st.title("💰 Meus Dividendos")
+
+    # SECÇÃO: Adicionar Ação
     st.subheader("➕ Adicionar Ação")
     with st.form("add_stock_form", clear_on_submit=True):
-        conta_selecionada = st.selectbox("Escolha a Conta:", user_data["contas"])
+        conta_selecionada = st.selectbox("Escolha a Conta onde comprou:", user_data["contas"])
         
         col1, col2 = st.columns([2, 1])
         with col1:
@@ -125,14 +146,12 @@ else:
                 "quantidade": float(qtd)
             })
             guardar_dados(dados_globais)
-            st.success(f"{ticker_final} adicionado!")
+            st.success(f"{ticker_final} adicionado à conta {conta_selecionada}!")
 
-    # --- SECÇÃO 3: Exibição da Carteira ---
+    # SECÇÃO: Exibição da Carteira
     if user_data["carteira"]:
         st.markdown("---")
-        st.subheader("📊 A tua Carteira")
-
-        filtro_conta = st.selectbox("🔍 Filtrar por Conta:", ["Todas as Contas"] + user_data["contas"])
+        st.subheader(f"📊 A tua Carteira ({filtro_conta})")
 
         if filtro_conta == "Todas as Contas":
             carteira_filtrada = user_data["carteira"]
@@ -168,16 +187,31 @@ else:
                             st.write(f"📅 **Último dividendo:** {ultimo_div:.4f} {moeda}/ação em {ultima_data}")
                             st.success(f"💵 **Recebido/Estimado:** {total_ultimo:.2f} {moeda}")
                         else:
-                            st.info("Sem histórico de dividendos encontrado.")
+                            st.info("Sem histórico recente de dividendos.")
 
                         st.markdown("---")
 
                     except Exception as e:
                         st.error(f"Erro ao carregar dados de {simbolo}.")
 
-        if st.button("🗑️ Limpar Toda a Carteira"):
-            user_data["carteira"] = []
-            guardar_dados(dados_globais)
-            st.rerun()
+        # 🗑️ Botão Limpar Carteira com Confirmação
+        if not st.session_state.confirmar_limpar_tudo:
+            if st.button("🗑️ Limpar Toda a Carteira"):
+                st.session_state.confirmar_limpar_tudo = True
+                st.rerun()
+        else:
+            st.warning("⚠️ **Tem a certeza absoluta de que quer APAGAR TODAS as ações da carteira?**")
+            col_sim, col_nao = st.columns(2)
+            with col_sim:
+                if st.button("✔️ Sim, Apagar Tudo"):
+                    user_data["carteira"] = []
+                    guardar_dados(dados_globais)
+                    st.session_state.confirmar_limpar_tudo = False
+                    st.success("Carteira limpa com sucesso!")
+                    st.rerun()
+            with col_nao:
+                if st.button("❌ Cancelar"):
+                    st.session_state.confirmar_limpar_tudo = False
+                    st.rerun()
     else:
         st.info("Adiciona uma ação acima para veres os teus dividendos.")
