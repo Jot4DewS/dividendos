@@ -1,66 +1,109 @@
 import datetime
+import json
+import os
 import pandas as pd
 import streamlit as st
 import yfinance as yf
 
-# Configuração da página para telemóvel
+# Configuração da página
 st.set_page_config(page_title="Meus Dividendos", page_icon="💰", layout="centered")
 
-# --- DEFINIÇÃO DO UTILIZADOR E PALAVRA-PASSE ---
-UTILIZADOR_CORRETO = "utilizador"
-PASSWORD_CORRETA = "1234"  # Podes alterar para a palavra-passe que quiseres!
+FICHEIRO_DADOS = "dados_app.json"
 
-# --- INICIALIZAÇÃO DO ESTADO DE LOGIN ---
+# --- FUNÇÕES PARA GUARDAR E CARREGAR DADOS ---
+def carregar_dados():
+    if os.path.exists(FICHEIRO_DADOS):
+        try:
+            with open(FICHEIRO_DADOS, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {"users": {}}
+    return {"users": {}}
+
+def guardar_dados(dados):
+    with open(FICHEIRO_DADOS, "w") as f:
+        json.dump(dados, f, indent=4)
+
+# --- INICIALIZAÇÃO DO ESTADO ---
+dados_globais = carregar_dados()
+
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
+if "user_atual" not in st.session_state:
+    st.session_state.user_atual = None
 
-# --- ECRÃ DE LOGIN ---
+# --- ECRÃ DE LOGIN / REGISTO ---
 if not st.session_state.autenticado:
-    st.title("🔒 Login - Meus Dividendos")
+    st.title("💰 Meus Dividendos")
     
-    with st.form("login_form"):
-        user_input = st.text_input("Utilizador:").strip()
-        pass_input = st.text_input("Palavra-passe:", type="password").strip()
-        btn_login = st.form_submit_button("Entrar")
-        
-        if btn_login:
-            if user_input == UTILIZADOR_CORRETO and pass_input == PASSWORD_CORRETA:
-                st.session_state.autenticado = True
-                st.success("Login efetuado com sucesso!")
-                st.rerun()
-            else:
-                st.error("Utilizador ou palavra-passe incorretos.")
+    opcao = st.radio("Escolhe uma opção:", ["Entrar (Login)", "Criar Nova Conta"], horizontal=True)
 
-# --- APLICAÇÃO PRINCIPAL (SÓ APARECE APÓS LOGIN) ---
+    if opcao == "Entrar (Login)":
+        with st.form("login_form"):
+            st.subheader("🔒 Entrar na Conta")
+            user_input = st.text_input("Utilizador:").strip().lower()
+            pass_input = st.text_input("Palavra-passe:", type="password").strip()
+            btn_login = st.form_submit_button("Entrar")
+
+            if btn_login:
+                if user_input in dados_globais["users"] and dados_globais["users"][user_input]["password"] == pass_input:
+                    st.session_state.autenticado = True
+                    st.session_state.user_atual = user_input
+                    st.success(f"Bem-vindo, {user_input}!")
+                    st.rerun()
+                else:
+                    st.error("Utilizador ou palavra-passe incorretos.")
+
+    else:
+        with st.form("registo_form"):
+            st.subheader("📝 Criar Nova Conta")
+            novo_user = st.text_input("Escolhe um Utilizador:").strip().lower()
+            nova_pass = st.text_input("Escolhe uma Palavra-passe:", type="password").strip()
+            btn_registo = st.form_submit_button("Criar Conta")
+
+            if btn_registo:
+                if not novo_user or not nova_pass:
+                    st.warning("Preenche todos os campos!")
+                elif novo_user in dados_globais["users"]:
+                    st.error("Este utilizador já existe! Escolhe outro nome.")
+                else:
+                    # Criar novo utilizador com carteira inicial
+                    dados_globais["users"][novo_user] = {
+                        "password": nova_pass,
+                        "contas": ["Geral", "DEGIRO", "Revolut"],
+                        "carteira": []
+                    }
+                    guardar_dados(dados_globais)
+                    st.success("Conta criada com sucesso! Já podes mudar para a opção 'Entrar (Login)'.")
+
+# --- APLICAÇÃO PRINCIPAL ---
 else:
+    user = st.session_state.user_atual
+    user_data = dados_globais["users"][user]
+
     # Menu Lateral
-    st.sidebar.write("Olá! 👋")
+    st.sidebar.write(f"Utilizador: **{user}** 👋")
     if st.sidebar.button("🚪 Sair / Logout"):
         st.session_state.autenticado = False
+        st.session_state.user_atual = None
         st.rerun()
 
     st.title("💰 Meus Dividendos")
-
-    # Inicialização de Estado da Carteira
-    if "contas" not in st.session_state:
-        st.session_state.contas = ["Geral", "DEGIRO", "Revolut"]
-
-    if "carteira" not in st.session_state:
-        st.session_state.carteira = []
 
     # --- SECÇÃO 1: Gestão de Contas ---
     with st.expander("⚙️ Gerir Contas / Corretoras"):
         nova_conta = st.text_input("Nome da Nova Conta (ex: Interactive Brokers):").strip()
         if st.button("➕ Adicionar Conta"):
-            if nova_conta and nova_conta not in st.session_state.contas:
-                st.session_state.contas.append(nova_conta)
+            if nova_conta and nova_conta not in user_data["contas"]:
+                user_data["contas"].append(nova_conta)
+                guardar_dados(dados_globais)
                 st.success(f"Conta '{nova_conta}' adicionada!")
                 st.rerun()
 
     # --- SECÇÃO 2: Adicionar Ação ---
     st.subheader("➕ Adicionar Ação")
     with st.form("add_stock_form", clear_on_submit=True):
-        conta_selecionada = st.selectbox("Escolha a Conta:", st.session_state.contas)
+        conta_selecionada = st.selectbox("Escolha a Conta:", user_data["contas"])
         
         col1, col2 = st.columns([2, 1])
         with col1:
@@ -76,34 +119,35 @@ else:
             else:
                 ticker_final = ticker_input
 
-            st.session_state.carteira.append({
+            user_data["carteira"].append({
                 "conta": conta_selecionada,
                 "ticker": ticker_final,
                 "quantidade": float(qtd)
             })
-            st.success(f"{ticker_final} adicionado à conta **{conta_selecionada}**!")
+            guardar_dados(dados_globais)
+            st.success(f"{ticker_final} adicionado!")
 
-    # --- SECÇÃO 3: Carteira e Próximos Dividendos ---
-    if st.session_state.carteira:
+    # --- SECÇÃO 3: Exibição da Carteira ---
+    if user_data["carteira"]:
         st.markdown("---")
         st.subheader("📊 A tua Carteira")
 
-        filtro_conta = st.selectbox("🔍 Filtrar por Conta:", ["Todas as Contas"] + st.session_state.contas)
+        filtro_conta = st.selectbox("🔍 Filtrar por Conta:", ["Todas as Contas"] + user_data["contas"])
 
         if filtro_conta == "Todas as Contas":
-            carteira_filtrada = st.session_state.carteira
+            carteira_filtrada = user_data["carteira"]
         else:
-            carteira_filtrada = [item for item in st.session_state.carteira if item["conta"] == filtro_conta]
+            carteira_filtrada = [item for item in user_data["carteira"] if item["conta"] == filtro_conta]
 
         if not carteira_filtrada:
-            st.info(f"Nenhuma ação registada na conta '{filtro_conta}'.")
+            st.info(f"Nenhuma ação registada em '{filtro_conta}'.")
         else:
             for item in carteira_filtrada:
                 simbolo = item["ticker"]
                 quantidade = item["quantidade"]
                 conta = item["conta"]
 
-                with st.spinner(f"A verificar dados de {simbolo}..."):
+                with st.spinner(f"A carregar {simbolo}..."):
                     try:
                         stock = yf.Ticker(simbolo)
                         info = stock.info
@@ -115,41 +159,16 @@ else:
                         st.caption(f"🏦 **Conta:** {conta}")
                         st.write(f"**Quantidade:** {quantidade:.4f} ações | **Preço:** {price:.2f} {moeda}")
 
-                        # Procura próximos dividendos
-                        calendar = stock.calendar
-                        ex_date = None
-                        pay_date = None
-
-                        if calendar is not None and not (isinstance(calendar, pd.DataFrame) and calendar.empty):
-                            if isinstance(calendar, dict):
-                                ex_date = calendar.get("Ex-Dividend Date")
-                                pay_date = calendar.get("Dividend Date")
-
-                        if not ex_date and "exDividendDate" in info and info["exDividendDate"]:
-                            ex_date = datetime.datetime.fromtimestamp(info["exDividendDate"]).date()
-
                         div_history = stock.dividends
 
-                        if ex_date or pay_date:
-                            st.subheader("🔔 Próximo Dividendo Anunciado")
-                            if ex_date:
-                                st.write(f"📌 **Data Ex-Dividendo:** {ex_date}")
-                            if pay_date:
-                                st.write(f"💳 **Data de Pagamento:** {pay_date}")
-
-                            if not div_history.empty:
-                                valor_por_acao = div_history.iloc[-1]
-                                total_estimado = valor_por_acao * quantidade
-                                st.success(f"💵 **Valor Estimado a Receber:** {total_estimado:.2f} {moeda} ({valor_por_acao:.4f} {moeda}/ação)")
-                        
-                        elif not div_history.empty:
+                        if not div_history.empty:
                             ultimo_div = div_history.iloc[-1]
                             ultima_data = div_history.index[-1].strftime("%d/%m/%Y")
                             total_ultimo = ultimo_div * quantidade
-                            st.write(f"📅 **Último dividendo pago:** {ultimo_div:.4f} {moeda}/ação em {ultima_data}")
-                            st.info(f"💵 **Recebeste no último pagamento:** {total_ultimo:.2f} {moeda}")
+                            st.write(f"📅 **Último dividendo:** {ultimo_div:.4f} {moeda}/ação em {ultima_data}")
+                            st.success(f"💵 **Recebido/Estimado:** {total_ultimo:.2f} {moeda}")
                         else:
-                            st.info("Sem anúncios ou histórico recente de dividendos.")
+                            st.info("Sem histórico de dividendos encontrado.")
 
                         st.markdown("---")
 
@@ -157,7 +176,8 @@ else:
                         st.error(f"Erro ao carregar dados de {simbolo}.")
 
         if st.button("🗑️ Limpar Toda a Carteira"):
-            st.session_state.carteira = []
+            user_data["carteira"] = []
+            guardar_dados(dados_globais)
             st.rerun()
     else:
-        st.info("Adiciona uma ação acima para começares a ver os teus dividendos.")
+        st.info("Adiciona uma ação acima para veres os teus dividendos.")
