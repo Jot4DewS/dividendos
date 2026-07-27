@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 import yfinance as yf
 
@@ -125,13 +126,11 @@ else:
     with st.form("add_stock_form", clear_on_submit=True):
         conta_selecionada = st.selectbox("Escolha a Conta onde comprou:", user_data["contas"])
         
-        col1, col2, col3 = st.columns([2, 1, 1])
+        col1, col2 = st.columns([2, 1])
         with col1:
             ticker_input = st.text_input("Ticker (ex: PETR4, AAPL, EDP.LS):").upper().strip()
         with col2:
             qtd = st.number_input("Quantidade:", min_value=0.0001, step=0.1, value=1.0, format="%.4f")
-        with col3:
-            data_compra = st.date_input("Data de Compra/Adição:", value=datetime.date.today())
 
         submitted = st.form_submit_button("Guardar Ação")
 
@@ -141,14 +140,24 @@ else:
             else:
                 ticker_final = ticker_input
 
-            user_data["carteira"].append({
-                "conta": conta_selecionada,
-                "ticker": ticker_final,
-                "quantidade": float(qtd),
-                "data_adicao": data_compra.strftime("%Y-%m-%d")
-            })
+            # SOMA ÁS EXISTENTES caso a ação já exista na mesma conta
+            encontrado = False
+            for item in user_data["carteira"]:
+                if item["ticker"] == ticker_final and item["conta"] == conta_selecionada:
+                    item["quantidade"] += float(qtd)
+                    encontrado = True
+                    break
+
+            if not encontrado:
+                user_data["carteira"].append({
+                    "conta": conta_selecionada,
+                    "ticker": ticker_final,
+                    "quantidade": float(qtd)
+                })
+
             guardar_dados(dados_globais)
-            st.success(f"{ticker_final} adicionado à conta {conta_selecionada}!")
+            st.success(f"{ticker_final} atualizado na conta {conta_selecionada}!")
+            st.rerun()
 
     # SECÇÃO: Exibição da Carteira
     if user_data["carteira"]:
@@ -164,76 +173,119 @@ else:
             st.info(f"Nenhuma ação registada em '{filtro_conta}'.")
         else:
             hoje = datetime.date.today()
+            
+            # Preparar dados para o Gráfico e Lista
+            dados_grafico = []
+            lista_acoes = []
 
             for item in carteira_filtrada:
                 simbolo = item["ticker"]
                 quantidade = item["quantidade"]
                 conta = item["conta"]
-                
-                # Obter a data de adição (padrão para hoje se for registo antigo)
-                str_data_adicao = item.get("data_adicao", hoje.strftime("%Y-%m-%d"))
+
                 try:
-                    dt_adicao = datetime.datetime.strptime(str_data_adicao, "%Y-%m-%d").date()
+                    stock = yf.Ticker(simbolo)
+                    info = stock.info
+                    nome = info.get("shortName", simbolo)
+                    moeda = info.get("currency", "USD")
+                    price = info.get("previousClose", 0) or info.get("currentPrice", 0)
+                    valor_total = price * quantidade
+
+                    dados_grafico.append({
+                        "Ticker": simbolo,
+                        "Nome": nome,
+                        "ValorTotal": valor_total,
+                        "Moeda": moeda
+                    })
+
+                    # Próximo dividendo
+                    calendar = stock.calendar
+                    proxima_data = None
+                    if calendar is not None and isinstance(calendar, dict):
+                        ex_div = calendar.get("Ex-Dividend Date")
+                        if ex_div:
+                            if isinstance(ex_div, (datetime.datetime, pd.Timestamp)):
+                                ex_div = ex_div.date()
+                            elif isinstance(ex_div, str):
+                                try:
+                                    ex_div = datetime.datetime.strptime(ex_div, "%Y-%m-%d").date()
+                                except Exception:
+                                    pass
+                            if isinstance(ex_div, datetime.date) and ex_div >= hoje:
+                                proxima_data = ex_div
+
+                    # Último dividendo
+                    div_history = stock.dividends
+                    ultimo_div_val = 0
+                    ultimo_div_data = None
+                    if not div_history.empty:
+                        ultimo_div_val = div_history.iloc[-1]
+                        ultimo_div_data = div_history.index[-1].strftime("%d/%m/%Y")
+
+                    lista_acoes.append({
+                        "simbolo": simbolo,
+                        "nome": nome,
+                        "conta": conta,
+                        "quantidade": quantidade,
+                        "preco": price,
+                        "moeda": moeda,
+                        "proxima_data": proxima_data,
+                        "ultimo_div_val": ultimo_div_val,
+                        "ultimo_div_data": ultimo_div_data
+                    })
                 except Exception:
-                    dt_adicao = hoje
+                    pass
 
-                with st.spinner(f"A carregar {simbolo}..."):
-                    try:
-                        stock = yf.Ticker(simbolo)
-                        info = stock.info
-                        nome = info.get("shortName", simbolo)
-                        moeda = info.get("currency", "USD")
-                        price = info.get("previousClose", 0) or info.get("currentPrice", 0)
+            # DISPLAY: Divisão em 2 colunas (Esquerda: Gráfico, Direita: Ações)
+            col_grafico, col_lista = st.columns([1, 1.2])
 
-                        st.markdown(f"### {nome} (`{simbolo}`)")
-                        st.caption(f"🏦 **Conta:** {conta} | 📅 **Adicionado em:** {dt_adicao.strftime('%d/%m/%Y')}")
-                        st.write(f"**Quantidade:** {quantidade:.4f} ações | **Preço:** {price:.2f} {moeda}")
+            with col_grafico:
+                if dados_grafico:
+                    df_grafico = pd.DataFrame(dados_grafico)
+                    total_patrimonio = df_grafico["ValorTotal"].sum()
+                    moeda_pred = df_grafico["Moeda"].iloc[0] if not df_grafico.empty else "$"
 
-                        # 1️⃣ PRÓXIMO DIVIDENDO (FUTURO)
-                        calendar = stock.calendar
-                        proxima_data = None
+                    fig = px.pie(
+                        df_grafico,
+                        values="ValorTotal",
+                        names="Ticker",
+                        hole=0.6,
+                        color_discrete_sequence=px.colors.qualitative.Bold
+                    )
+                    fig.update_traces(
+                        textposition="inside",
+                        textinfo="percent+label",
+                        hovertemplate="<b>%{label}</b><br>Valor: %{value:.2f}<extra></extra>"
+                    )
+                    fig.update_layout(
+                        annotations=[{
+                            "text": f"<b>Total</b><br>{total_patrimonio:.2f} {moeda_pred}",
+                            "x": 0.5, "y": 0.5, "font_size": 18, "showarrow": False
+                        }],
+                        showlegend=True,
+                        margin=dict(t=20, b=20, l=10, r=10)
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
 
-                        if calendar is not None and isinstance(calendar, dict):
-                            ex_div = calendar.get("Ex-Dividend Date")
-                            if ex_div:
-                                if isinstance(ex_div, (datetime.datetime, pd.Timestamp)):
-                                    ex_div = ex_div.date()
-                                elif isinstance(ex_div, str):
-                                    try:
-                                        ex_div = datetime.datetime.strptime(ex_div, "%Y-%m-%d").date()
-                                    except Exception:
-                                        pass
-                                
-                                if isinstance(ex_div, datetime.date) and ex_div >= hoje:
-                                    proxima_data = ex_div
+            with col_lista:
+                for acao in lista_acoes:
+                    st.markdown(f"### {acao['nome']} (`{acao['simbolo']}`)")
+                    st.caption(f"🏦 **Conta:** {acao['conta']}")
+                    st.write(f"**Quantidade:** {acao['quantidade']:.4f} ações | **Preço:** {acao['preco']:.2f} {acao['moeda']}")
 
-                        if proxima_data:
-                            st.info(f"🔮 **Próximo Dividendo Anunciado:** Ex-Dividendo em {proxima_data.strftime('%d/%m/%Y')}")
-                        else:
-                            st.caption("ℹ️ *Próximo dividendo ainda não foi anunciado oficialmente pela empresa.*")
+                    if acao['proxima_data']:
+                        st.info(f"🔮 **Próximo Dividendo:** Ex-Dividendo em {acao['proxima_data'].strftime('%d/%m/%Y')}")
+                    else:
+                        st.caption("ℹ️ *Próximo dividendo ainda não foi anunciado.*")
 
-                        # 2️⃣ ÚLTIMO DIVIDENDO PAGO
-                        div_history = stock.dividends
-                        if not div_history.empty:
-                            ultimo_div = div_history.iloc[-1]
-                            dt_div = div_history.index[-1].date()
-                            ultima_data_str = dt_div.strftime("%d/%m/%Y")
-                            total_calculado = ultimo_div * quantidade
+                    if acao['ultimo_div_val'] > 0:
+                        total_rec = acao['ultimo_div_val'] * acao['quantidade']
+                        st.write(f"⏮️ **Último dividendo pago:** {acao['ultimo_div_val']:.4f} {acao['moeda']}/ação ({acao['ultimo_div_data']})")
+                        st.success(f"💵 **Estimado/Recebido:** {total_rec:.2f} {acao['moeda']}")
+                    else:
+                        st.write("⏮️ **Último dividendo pago:** Sem histórico recente.")
 
-                            st.write(f"⏮️ **Último dividendo pago:** {ultimo_div:.4f} {moeda}/ação ({ultima_data_str})")
-
-                            # Lógica inteligente: Já tinhas a ação na altura do dividendo?
-                            if dt_div < dt_adicao:
-                                st.warning(f"💡 **Terias ganho:** {total_calculado:.2f} {moeda} *(dividendo pago antes de adicionares esta ação à carteira em {dt_adicao.strftime('%d/%m/%Y')})*")
-                            else:
-                                st.success(f"💵 **Total Recebido na Carteira:** {total_calculado:.2f} {moeda}")
-                        else:
-                            st.write("⏮️ **Último dividendo pago:** Sem histórico recente.")
-
-                        st.markdown("---")
-
-                    except Exception as e:
-                        st.error(f"Erro ao carregar dados de {simbolo}.")
+                    st.markdown("---")
 
         # Botão Limpar Carteira
         if not st.session_state.confirmar_limpar_tudo:
