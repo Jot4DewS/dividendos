@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 import yfinance as yf
 
-# Configuração da página para telemóvel/desktop
+# Configuração da página
 st.set_page_config(page_title="Meus Dividendos", page_icon="💰", layout="wide")
 
 FICHEIRO_DADOS = "dados_app.json"
@@ -93,7 +93,7 @@ else:
 
     st.sidebar.markdown("---")
     
-    # Gestão de Contas no Menu Lateral
+    # Gestão de Contas
     st.sidebar.subheader("🏦 As tuas Contas")
     filtro_conta = st.sidebar.selectbox("🔍 Filtrar Carteira:", ["Todas as Contas"] + user_data["contas"])
 
@@ -109,16 +109,15 @@ else:
         st.markdown("---")
         conta_para_apagar = st.selectbox("Selecione para apagar:", ["-- Selecionar --"] + user_data["contas"])
         if conta_para_apagar != "-- Selecionar --":
-            st.warning(f"Tem a certeza que quer apagar a conta '{conta_para_apagar}' e as suas ações?")
+            st.warning(f"Tem a certeza que quer apagar a conta '{conta_para_apagar}'?")
             if st.button(f"⚠️ Confirmar Apagar '{conta_para_apagar}'"):
                 user_data["contas"].remove(conta_para_apagar)
-                # Remove ações associadas a essa conta
                 user_data["carteira"] = [item for item in user_data["carteira"] if item["conta"] != conta_para_apagar]
                 guardar_dados(dados_globais)
                 st.success("Conta apagada!")
                 st.rerun()
 
-    # --- CONTEÚDO PRINCIPAL (CENTRO) ---
+    # --- CONTEÚDO PRINCIPAL ---
     st.title("💰 Meus Dividendos")
 
     # SECÇÃO: Adicionar Ação
@@ -161,6 +160,8 @@ else:
         if not carteira_filtrada:
             st.info(f"Nenhuma ação registada em '{filtro_conta}'.")
         else:
+            hoje = datetime.date.today()
+
             for item in carteira_filtrada:
                 simbolo = item["ticker"]
                 quantidade = item["quantidade"]
@@ -178,27 +179,43 @@ else:
                         st.caption(f"🏦 **Conta:** {conta}")
                         st.write(f"**Quantidade:** {quantidade:.4f} ações | **Preço:** {price:.2f} {moeda}")
 
-                        # Tentar obter próxima data ex-dividendo do calendário
+                        # 1️⃣ VERIFICAR PRÓXIMO DIVIDENDO (APENAS FUTURO)
                         calendar = stock.calendar
                         proxima_data = None
-                        if calendar is not None and isinstance(calendar, dict):
-                            if "Ex-Dividend Date" in calendar:
-                                proxima_data = calendar["Ex-Dividend Date"]
 
+                        if calendar is not None and isinstance(calendar, dict):
+                            ex_div = calendar.get("Ex-Dividend Date")
+                            if ex_div:
+                                # Garantir conversão para formato de data
+                                if isinstance(ex_div, (datetime.datetime, pd.Timestamp)):
+                                    ex_div = ex_div.date()
+                                elif isinstance(ex_div, str):
+                                    try:
+                                        ex_div = datetime.datetime.strptime(ex_div, "%Y-%m-%d").date()
+                                    except Exception:
+                                        pass
+                                
+                                # Só consideramos se for hoje ou no futuro!
+                                if isinstance(ex_div, datetime.date) and ex_div >= hoje:
+                                    proxima_data = ex_div
+
+                        # Exibir Próximo Dividendo
                         if proxima_data:
-                            st.info(f"📅 **Próximo Ex-Dividendo anunciado:** {proxima_data}")
+                            st.info(f"🔮 **Próximo Dividendo Anunciado:** Ex-Dividendo em {proxima_data.strftime('%d/%m/%Y')}")
                         else:
                             st.caption("ℹ️ *Próximo dividendo ainda não foi anunciado oficialmente pela empresa.*")
 
-                        # Histórico do último pago
+                        # 2️⃣ VERIFICAR ÚLTIMO DIVIDENDO PAGO
                         div_history = stock.dividends
                         if not div_history.empty:
                             ultimo_div = div_history.iloc[-1]
                             ultima_data = div_history.index[-1].strftime("%d/%m/%Y")
                             total_ultimo = ultimo_div * quantidade
-                            st.write(f"💵 **Último dividendo pago:** {ultimo_div:.4f} {moeda}/ação ({ultima_data})")
-                            st.success(f"💰 **Total Recebido na Carteira:** {total_ultimo:.2f} {moeda}")
-                        
+                            st.write(f"⏮️ **Último dividendo pago:** {ultimo_div:.4f} {moeda}/ação ({ultima_data})")
+                            st.success(f"💵 **Total que recebeste/estimado por este pagamento:** {total_ultimo:.2f} {moeda}")
+                        else:
+                            st.write("⏮️ **Último dividendo pago:** Sem histórico recente.")
+
                         st.markdown("---")
 
                     except Exception as e:
