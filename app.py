@@ -1,13 +1,19 @@
 import datetime
 import json
 import os
+import io
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 import yfinance as yf
 
-# Configuração da página
-st.set_page_config(page_title="Meus Dividendos", page_icon="💰", layout="wide")
+# Configuração da página (com menu lateral aberto por padrão)
+st.set_page_config(
+    page_title="Meus Dividendos", 
+    page_icon="💰", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 FICHEIRO_DADOS = "dados_app.json"
 
@@ -37,7 +43,7 @@ TEXTS = {
         "filter_portfolio": "🔍 Filtrar Carteira:",
         "all_accounts": "Todas as Contas",
         "manage_accounts": "⚙️ Criar / Apagar Conta",
-        "new_account_label": "Nova Conta (ex: Trading212):",
+        "new_account_label": "Nova Conta (ex: Trading212, DEGIRO):",
         "add": "➕ Adicionar",
         "account_added": "Conta '{}' adicionada!",
         "select_delete": "Selecione para apagar:",
@@ -69,11 +75,16 @@ TEXTS = {
         "yes_clear": "✔️ Sim, Apagar Tudo",
         "cancel": "❌ Cancelar",
         "portfolio_cleared": "Carteira limpa com sucesso!",
-        "add_stock_info": "Adiciona uma ação acima para veres os teus dividendos.",
+        "add_stock_info": "Adiciona uma ação acima ou importa um CSV para veres os teus dividendos.",
         "will_receive": "Vais receber",
         "confirm_delete_stock_q": "Apagar **{}** da conta **{}**?",
         "yes": "Sim",
-        "no": "Não"
+        "no": "Não",
+        "import_csv_title": "📥 Importar CSV",
+        "upload_csv": "Carregar ficheiro CSV:",
+        "import_btn": "Importar Ações",
+        "csv_success": "Importadas/Atualizadas {} ações na conta '{}'!",
+        "collapse_sidebar": "⬅️ Minimizar Menu"
     },
     "EN": {
         "title": "💰 My Dividends",
@@ -99,7 +110,7 @@ TEXTS = {
         "filter_portfolio": "🔍 Filter Portfolio:",
         "all_accounts": "All Accounts",
         "manage_accounts": "⚙️ Create / Delete Account",
-        "new_account_label": "New Account (e.g., Trading212):",
+        "new_account_label": "New Account (e.g., Trading212, DEGIRO):",
         "add": "➕ Add",
         "account_added": "Account '{}' added!",
         "select_delete": "Select to delete:",
@@ -131,11 +142,16 @@ TEXTS = {
         "yes_clear": "✔️ Yes, Clear All",
         "cancel": "❌ Cancel",
         "portfolio_cleared": "Portfolio cleared successfully!",
-        "add_stock_info": "Add a stock above to see your dividends.",
+        "add_stock_info": "Add a stock above or import a CSV to see your dividends.",
         "will_receive": "Will receive",
         "confirm_delete_stock_q": "Delete **{}** from account **{}**?",
         "yes": "Yes",
-        "no": "No"
+        "no": "No",
+        "import_csv_title": "📥 Import CSV",
+        "upload_csv": "Upload CSV file:",
+        "import_btn": "Import Stocks",
+        "csv_success": "Imported/Updated {} stocks in account '{}'!",
+        "collapse_sidebar": "⬅️ Collapse Menu"
     }
 }
 
@@ -209,7 +225,7 @@ if not st.session_state.autenticado:
                 else:
                     dados_globais["users"][novo_user] = {
                         "password": nova_pass,
-                        "contas": ["Geral", "DEGIRO", "Revolut"],
+                        "contas": ["Geral", "Trading212", "DEGIRO"],
                         "carteira": []
                     }
                     guardar_dados(dados_globais)
@@ -295,6 +311,70 @@ else:
         st.session_state.autenticado = False
         st.session_state.user_atual = None
         st.rerun()
+
+    # --- OPÇÃO: IMPORTAR CSV GERAL ---
+    with st.sidebar.expander(t["import_csv_title"]):
+        conta_dest_csv = st.selectbox(t["choose_account"], user_data["contas"], key="csv_acc")
+        uploaded_file = st.file_uploader(t["upload_csv"], type=["csv"])
+        
+        if uploaded_file is not None:
+            if st.button(t["import_btn"]):
+                try:
+                    df_csv = pd.read_csv(uploaded_file)
+                    
+                    compras_vendas = {}
+                    cols_lower = [c.lower() for c in df_csv.columns]
+                    
+                    # Tenta identificar colunas dinamicamente
+                    col_ticker = next((c for c in df_csv.columns if "ticker" in c.lower() or "symbol" in c.lower() or "ação" in c.lower()), None)
+                    col_shares = next((c for c in df_csv.columns if "shares" in c.lower() or "qty" in c.lower() or "qtd" in c.lower() or "quantidade" in c.lower()), None)
+                    col_action = next((c for c in df_csv.columns if "action" in c.lower() or "tipo" in c.lower() or "operação" in c.lower()), None)
+
+                    if col_ticker and col_shares:
+                        for _, row in df_csv.iterrows():
+                            tkr = str(row[col_ticker]).strip().upper()
+                            try:
+                                shs = float(row[col_shares])
+                            except Exception:
+                                continue
+
+                            act = str(row[col_action]).strip().lower() if col_action else "buy"
+
+                            if "sell" in act or "venda" in act:
+                                compras_vendas[tkr] = compras_vendas.get(tkr, 0.0) - shs
+                            else:
+                                compras_vendas[tkr] = compras_vendas.get(tkr, 0.0) + shs
+
+                        # Atualizar carteira do utilizador
+                        count_import = 0
+                        for tkr, qty in compras_vendas.items():
+                            if qty > 0:
+                                count_import += 1
+                                if len(tkr) >= 5 and tkr[-1].isdigit() and not tkr.endswith(".SA"):
+                                    tkr_final = f"{tkr}.SA"
+                                else:
+                                    tkr_final = tkr
+
+                                encontrado = False
+                                for item in user_data["carteira"]:
+                                    if item["ticker"] == tkr_final and item["conta"] == conta_dest_csv:
+                                        item["quantidade"] = qty
+                                        encontrado = True
+                                        break
+                                if not encontrado:
+                                    user_data["carteira"].append({
+                                        "conta": conta_dest_csv,
+                                        "ticker": tkr_final,
+                                        "quantidade": qty
+                                    })
+
+                        guardar_dados(dados_globais)
+                        st.success(t["csv_success"].format(count_import, conta_dest_csv))
+                        st.rerun()
+                    else:
+                        st.error("Não foi possível identificar as colunas do CSV. Certifique-se que contém colunas como Ticker/Symbol e Quantidade/Shares.")
+                except Exception as e:
+                    st.error(f"Erro ao ler CSV: {e}")
 
     st.sidebar.markdown("---")
     
