@@ -125,11 +125,13 @@ else:
     with st.form("add_stock_form", clear_on_submit=True):
         conta_selecionada = st.selectbox("Escolha a Conta onde comprou:", user_data["contas"])
         
-        col1, col2 = st.columns([2, 1])
+        col1, col2, col3 = st.columns([2, 1, 1])
         with col1:
             ticker_input = st.text_input("Ticker (ex: PETR4, AAPL, EDP.LS):").upper().strip()
         with col2:
             qtd = st.number_input("Quantidade:", min_value=0.0001, step=0.1, value=1.0, format="%.4f")
+        with col3:
+            data_compra = st.date_input("Data de Compra/Adição:", value=datetime.date.today())
 
         submitted = st.form_submit_button("Guardar Ação")
 
@@ -142,7 +144,8 @@ else:
             user_data["carteira"].append({
                 "conta": conta_selecionada,
                 "ticker": ticker_final,
-                "quantidade": float(qtd)
+                "quantidade": float(qtd),
+                "data_adicao": data_compra.strftime("%Y-%m-%d")
             })
             guardar_dados(dados_globais)
             st.success(f"{ticker_final} adicionado à conta {conta_selecionada}!")
@@ -166,6 +169,13 @@ else:
                 simbolo = item["ticker"]
                 quantidade = item["quantidade"]
                 conta = item["conta"]
+                
+                # Obter a data de adição (padrão para hoje se for registo antigo)
+                str_data_adicao = item.get("data_adicao", hoje.strftime("%Y-%m-%d"))
+                try:
+                    dt_adicao = datetime.datetime.strptime(str_data_adicao, "%Y-%m-%d").date()
+                except Exception:
+                    dt_adicao = hoje
 
                 with st.spinner(f"A carregar {simbolo}..."):
                     try:
@@ -176,17 +186,16 @@ else:
                         price = info.get("previousClose", 0) or info.get("currentPrice", 0)
 
                         st.markdown(f"### {nome} (`{simbolo}`)")
-                        st.caption(f"🏦 **Conta:** {conta}")
+                        st.caption(f"🏦 **Conta:** {conta} | 📅 **Adicionado em:** {dt_adicao.strftime('%d/%m/%Y')}")
                         st.write(f"**Quantidade:** {quantidade:.4f} ações | **Preço:** {price:.2f} {moeda}")
 
-                        # 1️⃣ VERIFICAR PRÓXIMO DIVIDENDO (APENAS FUTURO)
+                        # 1️⃣ PRÓXIMO DIVIDENDO (FUTURO)
                         calendar = stock.calendar
                         proxima_data = None
 
                         if calendar is not None and isinstance(calendar, dict):
                             ex_div = calendar.get("Ex-Dividend Date")
                             if ex_div:
-                                # Garantir conversão para formato de data
                                 if isinstance(ex_div, (datetime.datetime, pd.Timestamp)):
                                     ex_div = ex_div.date()
                                 elif isinstance(ex_div, str):
@@ -195,24 +204,29 @@ else:
                                     except Exception:
                                         pass
                                 
-                                # Só consideramos se for hoje ou no futuro!
                                 if isinstance(ex_div, datetime.date) and ex_div >= hoje:
                                     proxima_data = ex_div
 
-                        # Exibir Próximo Dividendo
                         if proxima_data:
                             st.info(f"🔮 **Próximo Dividendo Anunciado:** Ex-Dividendo em {proxima_data.strftime('%d/%m/%Y')}")
                         else:
                             st.caption("ℹ️ *Próximo dividendo ainda não foi anunciado oficialmente pela empresa.*")
 
-                        # 2️⃣ VERIFICAR ÚLTIMO DIVIDENDO PAGO
+                        # 2️⃣ ÚLTIMO DIVIDENDO PAGO
                         div_history = stock.dividends
                         if not div_history.empty:
                             ultimo_div = div_history.iloc[-1]
-                            ultima_data = div_history.index[-1].strftime("%d/%m/%Y")
-                            total_ultimo = ultimo_div * quantidade
-                            st.write(f"⏮️ **Último dividendo pago:** {ultimo_div:.4f} {moeda}/ação ({ultima_data})")
-                            st.success(f"💵 **Total que recebeste/estimado por este pagamento:** {total_ultimo:.2f} {moeda}")
+                            dt_div = div_history.index[-1].date()
+                            ultima_data_str = dt_div.strftime("%d/%m/%Y")
+                            total_calculado = ultimo_div * quantidade
+
+                            st.write(f"⏮️ **Último dividendo pago:** {ultimo_div:.4f} {moeda}/ação ({ultima_data_str})")
+
+                            # Lógica inteligente: Já tinhas a ação na altura do dividendo?
+                            if dt_div < dt_adicao:
+                                st.warning(f"💡 **Terias ganho:** {total_calculado:.2f} {moeda} *(dividendo pago antes de adicionares esta ação à carteira em {dt_adicao.strftime('%d/%m/%Y')})*")
+                            else:
+                                st.success(f"💵 **Total Recebido na Carteira:** {total_calculado:.2f} {moeda}")
                         else:
                             st.write("⏮️ **Último dividendo pago:** Sem histórico recente.")
 
@@ -221,7 +235,7 @@ else:
                     except Exception as e:
                         st.error(f"Erro ao carregar dados de {simbolo}.")
 
-        # Botão Limpar Carteira com Confirmação
+        # Botão Limpar Carteira
         if not st.session_state.confirmar_limpar_tudo:
             if st.button("🗑️ Limpar Toda a Carteira"):
                 st.session_state.confirmar_limpar_tudo = True
