@@ -1,48 +1,47 @@
 import datetime
 import pandas as pd
 import streamlit as st
-import streamlit_authenticator as stauth
 import yfinance as yf
 
 # Configuração da página para telemóvel
 st.set_page_config(page_title="Meus Dividendos", page_icon="💰", layout="centered")
 
-# --- CONFIGURAÇÃO DE LOGIN ---
-names = ["Meu Nome"]
-usernames = ["utilizador"]
-passwords = ["1234"]  # Altera a tua palavra-passe aqui!
+# --- DEFINIÇÃO DO UTILIZADOR E PALAVRA-PASSE ---
+UTILIZADOR_CORRETO = "utilizador"
+PASSWORD_CORRETA = "1234"  # Podes alterar para a palavra-passe que quiseres!
 
-hashed_passwords = stauth.Hasher(passwords).generate()
+# --- INICIALIZAÇÃO DO ESTADO DE LOGIN ---
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
 
-credentials = {
-    "usernames": {
-        usernames[0]: {
-            "name": names[0],
-            "password": hashed_passwords[0]
-        }
-    }
-}
+# --- ECRÃ DE LOGIN ---
+if not st.session_state.autenticado:
+    st.title("🔒 Login - Meus Dividendos")
+    
+    with st.form("login_form"):
+        user_input = st.text_input("Utilizador:").strip()
+        pass_input = st.text_input("Palavra-passe:", type="password").strip()
+        btn_login = st.form_submit_button("Entrar")
+        
+        if btn_login:
+            if user_input == UTILIZADOR_CORRETO and pass_input == PASSWORD_CORRETA:
+                st.session_state.autenticado = True
+                st.success("Login efetuado com sucesso!")
+                st.rerun()
+            else:
+                st.error("Utilizador ou palavra-passe incorretos.")
 
-authenticator = stauth.Authenticate(
-    credentials,
-    "dividendos_app_cookie",
-    "chave_secreta_12345",
-    cookie_expiry_days=30
-)
-
-name, authentication_status, username = authenticator.login("Login - Meus Dividendos", "main")
-
-if authentication_status == False:
-    st.error("Utilizador ou palavra-passe incorretos.")
-elif authentication_status == None:
-    st.warning("Por favor, introduz o teu utilizador e palavra-passe.")
-elif authentication_status:
-
-    st.sidebar.write(f"Olá, **{name}**! 👋")
-    authenticator.logout("Sair / Logout", "sidebar")
+# --- APLICAÇÃO PRINCIPAL (SÓ APARECE APÓS LOGIN) ---
+else:
+    # Menu Lateral
+    st.sidebar.write("Olá! 👋")
+    if st.sidebar.button("🚪 Sair / Logout"):
+        st.session_state.autenticado = False
+        st.rerun()
 
     st.title("💰 Meus Dividendos")
 
+    # Inicialização de Estado da Carteira
     if "contas" not in st.session_state:
         st.session_state.contas = ["Geral", "DEGIRO", "Revolut"]
 
@@ -104,7 +103,7 @@ elif authentication_status:
                 quantidade = item["quantidade"]
                 conta = item["conta"]
 
-                with st.spinner(f"A verificar dividendos para {simbolo}..."):
+                with st.spinner(f"A verificar dados de {simbolo}..."):
                     try:
                         stock = yf.Ticker(simbolo)
                         info = stock.info
@@ -116,7 +115,7 @@ elif authentication_status:
                         st.caption(f"🏦 **Conta:** {conta}")
                         st.write(f"**Quantidade:** {quantidade:.4f} ações | **Preço:** {price:.2f} {moeda}")
 
-                        # Procura o calendário de próximos eventos/dividendos
+                        # Procura próximos dividendos
                         calendar = stock.calendar
                         ex_date = None
                         pay_date = None
@@ -126,13 +125,11 @@ elif authentication_status:
                                 ex_date = calendar.get("Ex-Dividend Date")
                                 pay_date = calendar.get("Dividend Date")
 
-                        # Fallback se a data estiver no 'info'
                         if not ex_date and "exDividendDate" in info and info["exDividendDate"]:
                             ex_date = datetime.datetime.fromtimestamp(info["exDividendDate"]).date()
 
                         div_history = stock.dividends
 
-                        # Mostrar próximo pagamento (se já anunciado e futuro)
                         if ex_date or pay_date:
                             st.subheader("🔔 Próximo Dividendo Anunciado")
                             if ex_date:
@@ -145,7 +142,6 @@ elif authentication_status:
                                 total_estimado = valor_por_acao * quantidade
                                 st.success(f"💵 **Valor Estimado a Receber:** {total_estimado:.2f} {moeda} ({valor_por_acao:.4f} {moeda}/ação)")
                         
-                        # Histórico recente se não houver novo anúncio pendente
                         elif not div_history.empty:
                             ultimo_div = div_history.iloc[-1]
                             ultima_data = div_history.index[-1].strftime("%d/%m/%Y")
@@ -164,4 +160,5 @@ elif authentication_status:
             st.session_state.carteira = []
             st.rerun()
 else:
-    st.info("Adiciona uma ação acima para começares a ver os teus dividendos.")
+    if st.session_state.autenticado:
+        st.info("Adiciona uma ação acima para começares a ver os teus dividendos.")
