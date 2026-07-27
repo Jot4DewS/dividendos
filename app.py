@@ -83,6 +83,69 @@ else:
     user = st.session_state.user_atual
     user_data = dados_globais["users"][user]
 
+    # --- PROCESSAMENTO INICIAL DOS DADOS DA CARTEIRA ---
+    hoje = datetime.date.today()
+    carteira_completa = user_data["carteira"]
+    
+    dados_graficos_globais = []
+    lista_acoes_processadas = []
+
+    for item in carteira_completa:
+        simbolo = item["ticker"]
+        quantidade = item["quantidade"]
+        conta = item["conta"]
+
+        try:
+            stock = yf.Ticker(simbolo)
+            info = stock.info
+            nome = info.get("shortName", simbolo)
+            moeda = info.get("currency", "USD")
+            price = info.get("previousClose", 0) or info.get("currentPrice", 0)
+            valor_total = price * quantidade
+
+            # Obter último dividendo pago
+            div_history = stock.dividends
+            ultimo_div_val = 0
+            ultimo_div_data = None
+            if not div_history.empty:
+                ultimo_div_val = float(div_history.iloc[-1])
+                ultimo_div_data = div_history.index[-1].strftime("%d/%m/%Y")
+
+            total_dividendos_recebidos = ultimo_div_val * quantidade
+
+            # Obter Próximo Dividendo
+            calendar = stock.calendar
+            proxima_data = None
+            if calendar is not None and isinstance(calendar, dict):
+                ex_div = calendar.get("Ex-Dividend Date")
+                if ex_div:
+                    if isinstance(ex_div, (datetime.datetime, pd.Timestamp)):
+                        ex_div = ex_div.date()
+                    elif isinstance(ex_div, str):
+                        try:
+                            ex_div = datetime.datetime.strptime(ex_div, "%Y-%m-%d").date()
+                        except Exception:
+                            pass
+                    if isinstance(ex_div, datetime.date) and ex_div >= hoje:
+                        proxima_data = ex_div
+
+            dado = {
+                "ticker": simbolo,
+                "nome": nome,
+                "conta": conta,
+                "quantidade": quantidade,
+                "preco": price,
+                "valor_total": valor_total,
+                "moeda": moeda,
+                "proxima_data": proxima_data,
+                "ultimo_div_val": ultimo_div_val,
+                "ultimo_div_data": ultimo_div_data,
+                "total_dividendos": total_dividendos_recebidos
+            }
+            dados_graficos_globais.append(dado)
+        except Exception:
+            pass
+
     # --- MENU LATERAL (ESQUERDA) ---
     st.sidebar.title("📌 Menu")
     st.sidebar.write(f"Utilizador: **{user}** 👋")
@@ -118,6 +181,34 @@ else:
                 st.success("Conta apagada!")
                 st.rerun()
 
+    # MINI-GRÁFICO DE DIVIDENDOS (INCOMES) NO MENU LATERAL
+    if dados_graficos_globais:
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("💵 Income Dividendos")
+        df_sidebar = pd.DataFrame(dados_graficos_globais)
+        
+        fig_sidebar = px.bar(
+            df_sidebar,
+            x="ticker",
+            y="total_dividendos",
+            text="total_dividendos",
+            labels={"ticker": "Ação", "total_dividendos": "Income ($)"},
+            color="ticker",
+            color_discrete_sequence=px.colors.qualitative.Pastel
+        )
+        fig_sidebar.update_traces(
+            texttemplate="%{text:.2f}$",
+            textposition="outside"
+        )
+        fig_sidebar.update_layout(
+            height=200,
+            showlegend=False,
+            margin=dict(t=10, b=10, l=10, r=10),
+            xaxis_title=None,
+            yaxis_title=None
+        )
+        st.sidebar.plotly_chart(fig_sidebar, use_container_width=True)
+
     # --- CONTEÚDO PRINCIPAL ---
     st.title("💰 Meus Dividendos")
 
@@ -140,7 +231,7 @@ else:
             else:
                 ticker_final = ticker_input
 
-            # SOMA ÁS EXISTENTES caso a ação já exista na mesma conta
+            # Soma quantidade se já existir na mesma conta
             encontrado = False
             for item in user_data["carteira"]:
                 if item["ticker"] == ticker_final and item["conta"] == conta_selecionada:
@@ -160,116 +251,56 @@ else:
             st.rerun()
 
     # SECÇÃO: Exibição da Carteira
-    if user_data["carteira"]:
+    if dados_graficos_globais:
         st.markdown("---")
         st.subheader(f"📊 A tua Carteira ({filtro_conta})")
 
         if filtro_conta == "Todas as Contas":
-            carteira_filtrada = user_data["carteira"]
+            dados_filtrados = dados_graficos_globais
         else:
-            carteira_filtrada = [item for item in user_data["carteira"] if item["conta"] == filtro_conta]
+            dados_filtrados = [item for item in dados_graficos_globais if item["conta"] == filtro_conta]
 
-        if not carteira_filtrada:
+        if not dados_filtrados:
             st.info(f"Nenhuma ação registada em '{filtro_conta}'.")
         else:
-            hoje = datetime.date.today()
-            
-            # Preparar dados para o Gráfico e Lista
-            dados_grafico = []
-            lista_acoes = []
-
-            for item in carteira_filtrada:
-                simbolo = item["ticker"]
-                quantidade = item["quantidade"]
-                conta = item["conta"]
-
-                try:
-                    stock = yf.Ticker(simbolo)
-                    info = stock.info
-                    nome = info.get("shortName", simbolo)
-                    moeda = info.get("currency", "USD")
-                    price = info.get("previousClose", 0) or info.get("currentPrice", 0)
-                    valor_total = price * quantidade
-
-                    dados_grafico.append({
-                        "Ticker": simbolo,
-                        "Nome": nome,
-                        "ValorTotal": valor_total,
-                        "Moeda": moeda
-                    })
-
-                    # Próximo dividendo
-                    calendar = stock.calendar
-                    proxima_data = None
-                    if calendar is not None and isinstance(calendar, dict):
-                        ex_div = calendar.get("Ex-Dividend Date")
-                        if ex_div:
-                            if isinstance(ex_div, (datetime.datetime, pd.Timestamp)):
-                                ex_div = ex_div.date()
-                            elif isinstance(ex_div, str):
-                                try:
-                                    ex_div = datetime.datetime.strptime(ex_div, "%Y-%m-%d").date()
-                                except Exception:
-                                    pass
-                            if isinstance(ex_div, datetime.date) and ex_div >= hoje:
-                                proxima_data = ex_div
-
-                    # Último dividendo
-                    div_history = stock.dividends
-                    ultimo_div_val = 0
-                    ultimo_div_data = None
-                    if not div_history.empty:
-                        ultimo_div_val = div_history.iloc[-1]
-                        ultimo_div_data = div_history.index[-1].strftime("%d/%m/%Y")
-
-                    lista_acoes.append({
-                        "simbolo": simbolo,
-                        "nome": nome,
-                        "conta": conta,
-                        "quantidade": quantidade,
-                        "preco": price,
-                        "moeda": moeda,
-                        "proxima_data": proxima_data,
-                        "ultimo_div_val": ultimo_div_val,
-                        "ultimo_div_data": ultimo_div_data
-                    })
-                except Exception:
-                    pass
-
-            # DISPLAY: Divisão em 2 colunas (Esquerda: Gráfico, Direita: Ações)
-            col_grafico, col_lista = st.columns([1, 1.2])
+            # DISPLAY: Divisão em 2 colunas (Esquerda: Gráfico Pequeno Donut, Direita: Ações)
+            col_grafico, col_lista = st.columns([0.8, 1.2])
 
             with col_grafico:
-                if dados_grafico:
-                    df_grafico = pd.DataFrame(dados_grafico)
-                    total_patrimonio = df_grafico["ValorTotal"].sum()
-                    moeda_pred = df_grafico["Moeda"].iloc[0] if not df_grafico.empty else "$"
+                df_grafico = pd.DataFrame(dados_filtrados)
+                total_patrimonio = df_grafico["valor_total"].sum()
+                moeda_pred = df_grafico["moeda"].iloc[0] if not df_grafico.empty else "USD"
 
-                    fig = px.pie(
-                        df_grafico,
-                        values="ValorTotal",
-                        names="Ticker",
-                        hole=0.6,
-                        color_discrete_sequence=px.colors.qualitative.Bold
-                    )
-                    fig.update_traces(
-                        textposition="inside",
-                        textinfo="percent+label",
-                        hovertemplate="<b>%{label}</b><br>Valor: %{value:.2f}<extra></extra>"
-                    )
-                    fig.update_layout(
-                        annotations=[{
-                            "text": f"<b>Total</b><br>{total_patrimonio:.2f} {moeda_pred}",
-                            "x": 0.5, "y": 0.5, "font_size": 18, "showarrow": False
-                        }],
-                        showlegend=True,
-                        margin=dict(t=20, b=20, l=10, r=10)
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                fig = px.pie(
+                    df_grafico,
+                    values="valor_total",
+                    names="ticker",
+                    hole=0.6,
+                    color_discrete_sequence=px.colors.qualitative.Bold
+                )
+                
+                # MOSTRAR VALOR EXATO EM VEZ DE PERCENTAGEM
+                fig.update_traces(
+                    textposition="inside",
+                    texttemplate="<b>%{label}</b><br>%{value:.2f}",
+                    hovertemplate="<b>%{label}</b><br>Valor: %{value:.2f} " + moeda_pred + "<extra></extra>"
+                )
+                
+                # GRÁFICO MAIS PEQUENO (height=280)
+                fig.update_layout(
+                    height=280,
+                    annotations=[{
+                        "text": f"<b>Total</b><br>{total_patrimonio:.2f} {moeda_pred}",
+                        "x": 0.5, "y": 0.5, "font_size": 15, "showarrow": False
+                    }],
+                    showlegend=False,
+                    margin=dict(t=10, b=10, l=10, r=10)
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
             with col_lista:
-                for acao in lista_acoes:
-                    st.markdown(f"### {acao['nome']} (`{acao['simbolo']}`)")
+                for acao in dados_filtrados:
+                    st.markdown(f"### {acao['nome']} (`{acao['ticker']}`)")
                     st.caption(f"🏦 **Conta:** {acao['conta']}")
                     st.write(f"**Quantidade:** {acao['quantidade']:.4f} ações | **Preço:** {acao['preco']:.2f} {acao['moeda']}")
 
@@ -279,9 +310,8 @@ else:
                         st.caption("ℹ️ *Próximo dividendo ainda não foi anunciado.*")
 
                     if acao['ultimo_div_val'] > 0:
-                        total_rec = acao['ultimo_div_val'] * acao['quantidade']
                         st.write(f"⏮️ **Último dividendo pago:** {acao['ultimo_div_val']:.4f} {acao['moeda']}/ação ({acao['ultimo_div_data']})")
-                        st.success(f"💵 **Estimado/Recebido:** {total_rec:.2f} {acao['moeda']}")
+                        st.success(f"💵 **Estimado/Recebido:** {acao['total_dividendos']:.2f} {acao['moeda']}")
                     else:
                         st.write("⏮️ **Último dividendo pago:** Sem histórico recente.")
 
