@@ -71,7 +71,9 @@ TEXTS = {
         "portfolio_cleared": "Carteira limpa com sucesso!",
         "add_stock_info": "Adiciona uma ação acima para veres os teus dividendos.",
         "will_receive": "Vais receber",
-        "delete_stock": "🗑️ Apagar"
+        "confirm_delete_stock_q": "Apagar **{}** da conta **{}**?",
+        "yes": "Sim",
+        "no": "Não"
     },
     "EN": {
         "title": "💰 My Dividends",
@@ -131,7 +133,9 @@ TEXTS = {
         "portfolio_cleared": "Portfolio cleared successfully!",
         "add_stock_info": "Add a stock above to see your dividends.",
         "will_receive": "Will receive",
-        "delete_stock": "🗑️ Delete"
+        "confirm_delete_stock_q": "Delete **{}** from account **{}**?",
+        "yes": "Yes",
+        "no": "No"
     }
 }
 
@@ -160,6 +164,8 @@ if "confirmar_limpar_tudo" not in st.session_state:
     st.session_state.confirmar_limpar_tudo = False
 if "lang" not in st.session_state:
     st.session_state.lang = "PT"
+if "stock_to_delete" not in st.session_state:
+    st.session_state.stock_to_delete = None
 
 # --- SELETOR DE LÍNGUA NA BARRA LATERAL ---
 lang_choice = st.sidebar.selectbox("🌐 Idioma / Language", ["🇵🇹 Português", "🇬🇧 English"])
@@ -385,7 +391,7 @@ else:
                     encontrado = True
                     break
 
-            if not encontrado:
+            if not len(user_data["carteira"]) or not encontrado:
                 user_data["carteira"].append({
                     "conta": conta_selecionada,
                     "ticker": ticker_final,
@@ -443,20 +449,34 @@ else:
 
             with col_lista:
                 for idx, acao in enumerate(dados_filtrados):
-                    col_titulo, col_btn_del = st.columns([3, 1])
+                    col_titulo, col_btn_del = st.columns([12, 1])
                     
                     with col_titulo:
                         st.markdown(f"### {acao['nome']} (`{acao['ticker']}`)")
                     
                     with col_btn_del:
-                        # BOTÃO DE APAGAR AÇÃO INDIVIDUAL
-                        if st.button(t["delete_stock"], key=f"del_{acao['ticker']}_{acao['conta']}_{idx}"):
-                            user_data["carteira"] = [
-                                item for item in user_data["carteira"]
-                                if not (item["ticker"] == acao["ticker"] and item["conta"] == acao["conta"])
-                            ]
-                            guardar_dados(dados_globais)
+                        # BOTÃO PEQUENO COM "❌"
+                        if st.button("❌", key=f"btn_x_{acao['ticker']}_{acao['conta']}_{idx}"):
+                            st.session_state.stock_to_delete = f"{acao['ticker']}_{acao['conta']}"
                             st.rerun()
+
+                    # CAIXA DE CONFIRMAÇÃO SE FOI CLICADO NO "❌" DESTAS AÇÕES
+                    if st.session_state.stock_to_delete == f"{acao['ticker']}_{acao['conta']}":
+                        st.warning(t["confirm_delete_stock_q"].format(acao['ticker'], acao['conta']))
+                        c_sim, c_nao = st.columns(2)
+                        with c_sim:
+                            if st.button(t["yes"], key=f"yes_del_{acao['ticker']}_{acao['conta']}_{idx}"):
+                                user_data["carteira"] = [
+                                    item for item in user_data["carteira"]
+                                    if not (item["ticker"] == acao["ticker"] and item["conta"] == acao["conta"])
+                                ]
+                                guardar_dados(dados_globais)
+                                st.session_state.stock_to_delete = None
+                                st.rerun()
+                        with c_nao:
+                            if st.button(t["no"], key=f"no_del_{acao['ticker']}_{acao['conta']}_{idx}"):
+                                st.session_state.stock_to_delete = None
+                                st.rerun()
 
                     st.caption(f"🏦 **{t['account']}** {acao['conta']}")
                     st.write(f"**{t['quantity']}** {acao['quantidade']:.4f} {t['shares']} | **{t['price']}** {acao['preco']:.2f} {acao['moeda']}")
@@ -487,7 +507,6 @@ else:
                     user_data["carteira"] = []
                     guardar_dados(dados_globais)
                     st.session_state.confirmar_limpar_tudo = False
-                    st.success(t["portfolio_cleared"])
                     st.rerun()
             with col_nao:
                 if st.button(t["cancel"]):
