@@ -1,7 +1,6 @@
 import datetime
 import json
 import os
-import io
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -282,7 +281,6 @@ else:
                 encontrado = False
                 for item in user_data["carteira"]:
                     if item["ticker"] == ticker_final and item["conta"] == conta_selecionada:
-                        # Recalcular Preço Médio Ponderado
                         qtd_antiga = item.get("quantidade", 0)
                         prc_antigo = item.get("preco_compra", 0)
                         
@@ -328,13 +326,11 @@ else:
             moeda = info.get("currency", "USD")
             price = info.get("previousClose", 0) or info.get("currentPrice", 0)
             
-            # Se não definiu preço de compra, assume o preço de mercado atual como preço médio
             prc_medio_utilizado = preco_compra if preco_compra > 0 else price
             total_investido = prc_medio_utilizado * quantidade
             valor_total_atual = price * quantidade
             ganho_perda = valor_total_atual - total_investido
 
-            # Obter último dividendo pago
             div_history = stock.dividends
             ultimo_div_val = 0
             ultimo_div_data = None
@@ -342,7 +338,6 @@ else:
                 ultimo_div_val = float(div_history.iloc[-1])
                 ultimo_div_data = div_history.index[-1].strftime("%d/%m/%Y")
 
-            # Obter Próximo Dividendo
             calendar = stock.calendar
             proxima_data = None
             proximo_div_val = 0.0
@@ -584,7 +579,6 @@ else:
 
                 st.caption(f"💵 **{t['total_invested']}** {total_investido_geral:.2f} {moeda_pred}")
 
-                # BOTÃO PARA ADICIONAR AÇÃO COM COR VERDE AJUSTADA
                 if st.button(t["add_stock"], key="btn_add_action_popup", use_container_width=True):
                     modal_adicionar_acao()
 
@@ -622,7 +616,8 @@ else:
                     
                     if acao['preco_compra'] > 0:
                         cor_lucro = "green" if acao['ganho_perda'] >= 0 else "red"
-                        st.write(f"**{t['avg_price']}** {acao['preco_compra']:.2f} {acao['moeda']} | **{t['total_invested']}** {acao['total_invested']:.2f} {acao['moeda']}")
+                        # Linha com a correção da chave acao['total_investido']
+                        st.write(f"**{t['avg_price']}** {acao['preco_compra']:.2f} {acao['moeda']} | **{t['total_invested']}** {acao['total_investido']:.2f} {acao['moeda']}")
                         st.markdown(f"**{t['profit_loss']}** <span style='color:{cor_lucro}; font-weight:bold;'>{acao['ganho_perda']:+.2f} {acao['moeda']}</span>", unsafe_allow_html=True)
 
                     if acao['proxima_data']:
