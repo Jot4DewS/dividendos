@@ -159,6 +159,5 @@ else:
         if st.button("🗑️ Limpar Toda a Carteira"):
             st.session_state.carteira = []
             st.rerun()
-else:
-    if st.session_state.autenticado:
+    else:
         st.info("Adiciona uma ação acima para começares a ver os teus dividendos.")
