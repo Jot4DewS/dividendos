@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 import yfinance as yf
 
-# Configuração da página
+# Configuração da página para telemóvel/desktop
 st.set_page_config(page_title="Meus Dividendos", page_icon="💰", layout="wide")
 
 FICHEIRO_DADOS = "dados_app.json"
@@ -75,7 +75,7 @@ if not st.session_state.autenticado:
                         "carteira": []
                     }
                     guardar_dados(dados_globais)
-                    st.success("Conta criada com sucesso! Faz login.")
+                    st.success("Conta criada com sucesso! Mude para a opção 'Entrar (Login)'.")
 
 # --- APLICAÇÃO PRINCIPAL ---
 else:
@@ -93,7 +93,7 @@ else:
 
     st.sidebar.markdown("---")
     
-    # 🏦 Gestão de Contas no Menu da Esquerda
+    # Gestão de Contas no Menu Lateral
     st.sidebar.subheader("🏦 As tuas Contas")
     filtro_conta = st.sidebar.selectbox("🔍 Filtrar Carteira:", ["Todas as Contas"] + user_data["contas"])
 
@@ -178,23 +178,33 @@ else:
                         st.caption(f"🏦 **Conta:** {conta}")
                         st.write(f"**Quantidade:** {quantidade:.4f} ações | **Preço:** {price:.2f} {moeda}")
 
-                        div_history = stock.dividends
+                        # Tentar obter próxima data ex-dividendo do calendário
+                        calendar = stock.calendar
+                        proxima_data = None
+                        if calendar is not None and isinstance(calendar, dict):
+                            if "Ex-Dividend Date" in calendar:
+                                proxima_data = calendar["Ex-Dividend Date"]
 
+                        if proxima_data:
+                            st.info(f"📅 **Próximo Ex-Dividendo anunciado:** {proxima_data}")
+                        else:
+                            st.caption("ℹ️ *Próximo dividendo ainda não foi anunciado oficialmente pela empresa.*")
+
+                        # Histórico do último pago
+                        div_history = stock.dividends
                         if not div_history.empty:
                             ultimo_div = div_history.iloc[-1]
                             ultima_data = div_history.index[-1].strftime("%d/%m/%Y")
                             total_ultimo = ultimo_div * quantidade
-                            st.write(f"📅 **Último dividendo:** {ultimo_div:.4f} {moeda}/ação em {ultima_data}")
-                            st.success(f"💵 **Recebido/Estimado:** {total_ultimo:.2f} {moeda}")
-                        else:
-                            st.info("Sem histórico recente de dividendos.")
-
+                            st.write(f"💵 **Último dividendo pago:** {ultimo_div:.4f} {moeda}/ação ({ultima_data})")
+                            st.success(f"💰 **Total Recebido na Carteira:** {total_ultimo:.2f} {moeda}")
+                        
                         st.markdown("---")
 
                     except Exception as e:
                         st.error(f"Erro ao carregar dados de {simbolo}.")
 
-        # 🗑️ Botão Limpar Carteira com Confirmação
+        # Botão Limpar Carteira com Confirmação
         if not st.session_state.confirmar_limpar_tudo:
             if st.button("🗑️ Limpar Toda a Carteira"):
                 st.session_state.confirmar_limpar_tudo = True
