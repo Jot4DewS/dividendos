@@ -70,7 +70,8 @@ TEXTS = {
         "cancel": "❌ Cancelar",
         "portfolio_cleared": "Carteira limpa com sucesso!",
         "add_stock_info": "Adiciona uma ação acima para veres os teus dividendos.",
-        "will_receive": "Vais receber"
+        "will_receive": "Vais receber",
+        "delete_stock": "🗑️ Apagar"
     },
     "EN": {
         "title": "💰 My Dividends",
@@ -129,7 +130,8 @@ TEXTS = {
         "cancel": "❌ Cancel",
         "portfolio_cleared": "Portfolio cleared successfully!",
         "add_stock_info": "Add a stock above to see your dividends.",
-        "will_receive": "Will receive"
+        "will_receive": "Will receive",
+        "delete_stock": "🗑️ Delete"
     }
 }
 
@@ -440,8 +442,22 @@ else:
                 st.plotly_chart(fig, use_container_width=True)
 
             with col_lista:
-                for acao in dados_filtrados:
-                    st.markdown(f"### {acao['nome']} (`{acao['ticker']}`)")
+                for idx, acao in enumerate(dados_filtrados):
+                    col_titulo, col_btn_del = st.columns([3, 1])
+                    
+                    with col_titulo:
+                        st.markdown(f"### {acao['nome']} (`{acao['ticker']}`)")
+                    
+                    with col_btn_del:
+                        # BOTÃO DE APAGAR AÇÃO INDIVIDUAL
+                        if st.button(t["delete_stock"], key=f"del_{acao['ticker']}_{acao['conta']}_{idx}"):
+                            user_data["carteira"] = [
+                                item for item in user_data["carteira"]
+                                if not (item["ticker"] == acao["ticker"] and item["conta"] == acao["conta"])
+                            ]
+                            guardar_dados(dados_globais)
+                            st.rerun()
+
                     st.caption(f"🏦 **{t['account']}** {acao['conta']}")
                     st.write(f"**{t['quantity']}** {acao['quantidade']:.4f} {t['shares']} | **{t['price']}** {acao['preco']:.2f} {acao['moeda']}")
 
@@ -458,7 +474,7 @@ else:
 
                     st.markdown("---")
 
-        # Botão Limpar Carteira
+        # Botão Limpar Carteira Toda
         if not st.session_state.confirmar_limpar_tudo:
             if st.button(t["clear_portfolio"]):
                 st.session_state.confirmar_limpar_tudo = True
