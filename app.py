@@ -11,6 +11,128 @@ st.set_page_config(page_title="Meus Dividendos", page_icon="💰", layout="wide"
 
 FICHEIRO_DADOS = "dados_app.json"
 
+# --- DICIONÁRIO DE TRADUÇÃO (PT / EN) ---
+TEXTS = {
+    "PT": {
+        "title": "💰 Meus Dividendos",
+        "select_option": "Escolhe uma opção:",
+        "login_option": "Entrar (Login)",
+        "register_option": "Criar Nova Conta",
+        "login_header": "🔒 Entrar na Conta",
+        "user": "Utilizador:",
+        "password": "Palavra-passe:",
+        "login_btn": "Entrar",
+        "login_success": "Bem-vindo, {}!",
+        "login_error": "Utilizador ou palavra-passe incorretos.",
+        "register_header": "📝 Criar Nova Conta",
+        "new_user": "Escolhe um Utilizador:",
+        "new_pass": "Escolhe uma Palavra-passe:",
+        "register_btn": "Criar Conta",
+        "fill_all": "Preenche todos os campos!",
+        "user_exists": "Este utilizador já existe!",
+        "register_success": "Conta criada com sucesso! Mude para a opção 'Entrar (Login)'.",
+        "menu": "📌 Menu",
+        "logout": "🚪 Sair / Logout",
+        "your_accounts": "🏦 As tuas Contas",
+        "filter_portfolio": "🔍 Filtrar Carteira:",
+        "all_accounts": "Todas as Contas",
+        "manage_accounts": "⚙️ Criar / Apagar Conta",
+        "new_account_label": "Nova Conta (ex: Trading212):",
+        "add": "➕ Adicionar",
+        "account_added": "Conta '{}' adicionada!",
+        "select_delete": "Selecione para apagar:",
+        "select": "-- Selecionar --",
+        "confirm_delete_q": "Tem a certeza que quer apagar a conta '{}'?",
+        "confirm_delete_btn": "⚠️ Confirmar Apagar '{}'",
+        "account_deleted": "Conta apagada!",
+        "upcoming_divs": "📅 Próximos Dividendos",
+        "no_upcoming": "Nenhuma das tuas ações anunciou o próximo dividendo ainda.",
+        "add_stock": "➕ Adicionar Ação",
+        "choose_account": "Escolha a Conta onde comprou:",
+        "ticker_label": "Ticker (ex: PETR4, AAPL, EDP.LS):",
+        "quantity_label": "Quantidade:",
+        "save_stock": "Guardar Ação",
+        "stock_updated": "{} atualizado na conta {}!",
+        "your_portfolio": "📊 A tua Carteira ({})",
+        "no_stocks_account": "Nenhuma ação registada em '{}'.",
+        "total": "Total",
+        "quantity": "Quantidade:",
+        "shares": "ações",
+        "price": "Preço:",
+        "account": "Conta:",
+        "next_div": "🔮 **Próximo Dividendo:** Ex-Dividendo em {} ➔ **Vais receber:** {:.2f} {}",
+        "next_div_not_announced": "ℹ️ *Próximo dividendo ainda não foi anunciado.*",
+        "last_div": "⏮️ **Último dividendo pago:** {:.4f} {}/ação ({})",
+        "last_div_none": "⏮️ **Último dividendo pago:** Sem histórico recente.",
+        "clear_portfolio": "🗑️ Limpar Toda a Carteira",
+        "clear_confirm_q": "⚠️ **Tem a certeza absoluta de que quer APAGAR TODAS as ações da carteira?**",
+        "yes_clear": "✔️ Sim, Apagar Tudo",
+        "cancel": "❌ Cancelar",
+        "portfolio_cleared": "Carteira limpa com sucesso!",
+        "add_stock_info": "Adiciona uma ação acima para veres os teus dividendos.",
+        "will_receive": "Vais receber"
+    },
+    "EN": {
+        "title": "💰 My Dividends",
+        "select_option": "Choose an option:",
+        "login_option": "Login",
+        "register_option": "Create New Account",
+        "login_header": "🔒 Login to Account",
+        "user": "Username:",
+        "password": "Password:",
+        "login_btn": "Login",
+        "login_success": "Welcome, {}!",
+        "login_error": "Incorrect username or password.",
+        "register_header": "📝 Create New Account",
+        "new_user": "Choose a Username:",
+        "new_pass": "Choose a Password:",
+        "register_btn": "Create Account",
+        "fill_all": "Please fill in all fields!",
+        "user_exists": "This username already exists!",
+        "register_success": "Account created successfully! Switch to 'Login'.",
+        "menu": "📌 Menu",
+        "logout": "🚪 Logout",
+        "your_accounts": "🏦 Your Accounts",
+        "filter_portfolio": "🔍 Filter Portfolio:",
+        "all_accounts": "All Accounts",
+        "manage_accounts": "⚙️ Create / Delete Account",
+        "new_account_label": "New Account (e.g., Trading212):",
+        "add": "➕ Add",
+        "account_added": "Account '{}' added!",
+        "select_delete": "Select to delete:",
+        "select": "-- Select --",
+        "confirm_delete_q": "Are you sure you want to delete account '{}'?",
+        "confirm_delete_btn": "⚠️ Confirm Delete '{}'",
+        "account_deleted": "Account deleted!",
+        "upcoming_divs": "📅 Upcoming Dividends",
+        "no_upcoming": "None of your stocks have announced upcoming dividends yet.",
+        "add_stock": "➕ Add Stock",
+        "choose_account": "Choose the Account:",
+        "ticker_label": "Ticker (e.g., PETR4, AAPL, EDP.LS):",
+        "quantity_label": "Quantity:",
+        "save_stock": "Save Stock",
+        "stock_updated": "{} updated in account {}!",
+        "your_portfolio": "📊 Your Portfolio ({})",
+        "no_stocks_account": "No stocks registered in '{}'.",
+        "total": "Total",
+        "quantity": "Quantity:",
+        "shares": "shares",
+        "price": "Price:",
+        "account": "Account:",
+        "next_div": "🔮 **Next Dividend:** Ex-Dividend on {} ➔ **You will receive:** {:.2f} {}",
+        "next_div_not_announced": "ℹ️ *Next dividend not announced yet.*",
+        "last_div": "⏮️ **Last dividend paid:** {:.4f} {}/share ({})",
+        "last_div_none": "⏮️ **Last dividend paid:** No recent history.",
+        "clear_portfolio": "🗑️ Clear Entire Portfolio",
+        "clear_confirm_q": "⚠️ **Are you absolutely sure you want to DELETE ALL stocks in portfolio?**",
+        "yes_clear": "✔️ Yes, Clear All",
+        "cancel": "❌ Cancel",
+        "portfolio_cleared": "Portfolio cleared successfully!",
+        "add_stock_info": "Add a stock above to see your dividends.",
+        "will_receive": "Will receive"
+    }
+}
+
 # --- FUNÇÕES PARA GUARDAR E CARREGAR DADOS ---
 def carregar_dados():
     if os.path.exists(FICHEIRO_DADOS):
@@ -34,41 +156,48 @@ if "user_atual" not in st.session_state:
     st.session_state.user_atual = None
 if "confirmar_limpar_tudo" not in st.session_state:
     st.session_state.confirmar_limpar_tudo = False
+if "lang" not in st.session_state:
+    st.session_state.lang = "PT"
+
+# --- SELETOR DE LÍNGUA NA BARRA LATERAL ---
+lang_choice = st.sidebar.selectbox("🌐 Idioma / Language", ["🇵🇹 Português", "🇬🇧 English"])
+st.session_state.lang = "PT" if "Português" in lang_choice else "EN"
+t = TEXTS[st.session_state.lang]
 
 # --- ECRÃ DE LOGIN / REGISTO ---
 if not st.session_state.autenticado:
-    st.title("💰 Meus Dividendos")
+    st.title(t["title"])
     
-    opcao = st.radio("Escolhe uma opção:", ["Entrar (Login)", "Criar Nova Conta"], horizontal=True)
+    opcao = st.radio(t["select_option"], [t["login_option"], t["register_option"]], horizontal=True)
 
-    if opcao == "Entrar (Login)":
+    if opcao == t["login_option"]:
         with st.form("login_form"):
-            st.subheader("🔒 Entrar na Conta")
-            user_input = st.text_input("Utilizador:").strip().lower()
-            pass_input = st.text_input("Palavra-passe:", type="password").strip()
-            btn_login = st.form_submit_button("Entrar")
+            st.subheader(t["login_header"])
+            user_input = st.text_input(t["user"]).strip().lower()
+            pass_input = st.text_input(t["password"], type="password").strip()
+            btn_login = st.form_submit_button(t["login_btn"])
 
             if btn_login:
                 if user_input in dados_globais["users"] and dados_globais["users"][user_input]["password"] == pass_input:
                     st.session_state.autenticado = True
                     st.session_state.user_atual = user_input
-                    st.success(f"Bem-vindo, {user_input}!")
+                    st.success(t["login_success"].format(user_input))
                     st.rerun()
                 else:
-                    st.error("Utilizador ou palavra-passe incorretos.")
+                    st.error(t["login_error"])
 
     else:
         with st.form("registo_form"):
-            st.subheader("📝 Criar Nova Conta")
-            novo_user = st.text_input("Escolhe um Utilizador:").strip().lower()
-            nova_pass = st.text_input("Escolhe uma Palavra-passe:", type="password").strip()
-            btn_registo = st.form_submit_button("Criar Conta")
+            st.subheader(t["register_header"])
+            novo_user = st.text_input(t["new_user"]).strip().lower()
+            nova_pass = st.text_input(t["new_pass"], type="password").strip()
+            btn_registo = st.form_submit_button(t["register_btn"])
 
             if btn_registo:
                 if not novo_user or not nova_pass:
-                    st.warning("Preenche todos os campos!")
+                    st.warning(t["fill_all"])
                 elif novo_user in dados_globais["users"]:
-                    st.error("Este utilizador já existe!")
+                    st.error(t["user_exists"])
                 else:
                     dados_globais["users"][novo_user] = {
                         "password": nova_pass,
@@ -76,7 +205,7 @@ if not st.session_state.autenticado:
                         "carteira": []
                     }
                     guardar_dados(dados_globais)
-                    st.success("Conta criada com sucesso! Mude para a opção 'Entrar (Login)'.")
+                    st.success(t["register_success"])
 
 # --- APLICAÇÃO PRINCIPAL ---
 else:
@@ -110,14 +239,13 @@ else:
                 ultimo_div_val = float(div_history.iloc[-1])
                 ultimo_div_data = div_history.index[-1].strftime("%d/%m/%Y")
 
-            # Obter Próximo DividendoAnunciado
+            # Obter Próximo Dividendo
             calendar = stock.calendar
             proxima_data = None
             proximo_div_val = 0.0
 
             if calendar is not None and isinstance(calendar, dict):
                 ex_div = calendar.get("Ex-Dividend Date")
-                div_rate = calendar.get("Dividend Date") or calendar.get("Dividend Rate")
                 
                 if ex_div:
                     if isinstance(ex_div, (datetime.datetime, pd.Timestamp)):
@@ -129,10 +257,8 @@ else:
                             pass
                     if isinstance(ex_div, datetime.date) and ex_div >= hoje:
                         proxima_data = ex_div
-                        # Usa o último valor do dividendo como estimativa por ação para o próximo pagamento
-                        proximo_div_val = ultimo_div_val 
+                        proximo_div_val = ultimo_div_val
 
-            # Calculo do rendimento a receber no próximo dividendo
             income_proximo = proximo_div_val * quantidade if proxima_data else 0.0
 
             dado = {
@@ -154,10 +280,10 @@ else:
             pass
 
     # --- MENU LATERAL (ESQUERDA) ---
-    st.sidebar.title("📌 Menu")
-    st.sidebar.write(f"Utilizador: **{user}** 👋")
+    st.sidebar.title(t["menu"])
+    st.sidebar.write(f"{t['user'].replace(':', '')}: **{user}** 👋")
     
-    if st.sidebar.button("🚪 Sair / Logout"):
+    if st.sidebar.button(t["logout"]):
         st.session_state.autenticado = False
         st.session_state.user_atual = None
         st.rerun()
@@ -165,82 +291,84 @@ else:
     st.sidebar.markdown("---")
     
     # Gestão de Contas
-    st.sidebar.subheader("🏦 As tuas Contas")
-    filtro_conta = st.sidebar.selectbox("🔍 Filtrar Carteira:", ["Todas as Contas"] + user_data["contas"])
+    st.sidebar.subheader(t["your_accounts"])
+    filtro_conta = st.sidebar.selectbox(t["filter_portfolio"], [t["all_accounts"]] + user_data["contas"])
 
-    with st.sidebar.expander("⚙️ Criar / Apagar Conta"):
-        nova_conta = st.text_input("Nova Conta (ex: Trading212):").strip()
-        if st.button("➕ Adicionar"):
+    with st.sidebar.expander(t["manage_accounts"]):
+        nova_conta = st.text_input(t["new_account_label"]).strip()
+        if st.button(t["add"]):
             if nova_conta and nova_conta not in user_data["contas"]:
                 user_data["contas"].append(nova_conta)
                 guardar_dados(dados_globais)
-                st.success(f"Conta '{nova_conta}' adicionada!")
+                st.success(t["account_added"].format(nova_conta))
                 st.rerun()
 
         st.markdown("---")
-        conta_para_apagar = st.selectbox("Selecione para apagar:", ["-- Selecionar --"] + user_data["contas"])
-        if conta_para_apagar != "-- Selecionar --":
-            st.warning(f"Tem a certeza que quer apagar a conta '{conta_para_apagar}'?")
-            if st.button(f"⚠️ Confirmar Apagar '{conta_para_apagar}'"):
+        conta_para_apagar = st.selectbox(t["select_delete"], [t["select"]] + user_data["contas"])
+        if conta_para_apagar != t["select"]:
+            st.warning(t["confirm_delete_q"].format(conta_para_apagar))
+            if st.button(t["confirm_delete_btn"].format(conta_para_apagar)):
                 user_data["contas"].remove(conta_para_apagar)
                 user_data["carteira"] = [item for item in user_data["carteira"] if item["conta"] != conta_para_apagar]
                 guardar_dados(dados_globais)
-                st.success("Conta apagada!")
+                st.success(t["account_deleted"])
                 st.rerun()
 
-    # MINI-GRÁFICO DE PRÓXIMOS DIVIDENDOS (INCOMES ANUNCIADOS) NO MENU
+    # MINI-GRÁFICO REDONDO (DONUT) DE PRÓXIMOS DIVIDENDOS NO MENU
     if dados_graficos_globais:
         st.sidebar.markdown("---")
-        st.sidebar.subheader("📅 Próximos Dividendos")
+        st.sidebar.subheader(t["upcoming_divs"])
         
-        # Filtrar apenas as ações que têm dividendo próximo anunciado
         acoes_com_proximo = [item for item in dados_graficos_globais if item["proxima_data"] is not None and item["income_proximo"] > 0]
         
         if acoes_com_proximo:
             df_sidebar = pd.DataFrame(acoes_com_proximo)
-            
-            fig_sidebar = px.bar(
+            total_income = df_sidebar["income_proximo"].sum()
+            moeda_sidebar = df_sidebar["moeda"].iloc[0] if not df_sidebar.empty else "USD"
+
+            fig_sidebar = px.pie(
                 df_sidebar,
-                x="ticker",
-                y="income_proximo",
-                text="income_proximo",
-                labels={"ticker": "Ação", "income_proximo": "A Receber ($)"},
-                color="ticker",
+                values="income_proximo",
+                names="ticker",
+                hole=0.6,
                 color_discrete_sequence=px.colors.qualitative.Pastel
             )
             fig_sidebar.update_traces(
-                texttemplate="%{text:.2f}$",
-                textposition="outside"
+                textposition="inside",
+                texttemplate="<b>%{label}</b><br>%{value:.2f}",
+                hovertemplate="<b>%{label}</b><br>" + t["will_receive"] + ": %{value:.2f} " + moeda_sidebar + "<extra></extra>"
             )
             fig_sidebar.update_layout(
-                height=220,
+                height=230,
+                annotations=[{
+                    "text": f"<b>Total</b><br>{total_income:.2f} {moeda_sidebar}",
+                    "x": 0.5, "y": 0.5, "font_size": 13, "showarrow": False
+                }],
                 showlegend=False,
-                margin=dict(t=15, b=10, l=10, r=10),
-                xaxis_title=None,
-                yaxis_title=None
+                margin=dict(t=10, b=10, l=10, r=10)
             )
             st.sidebar.plotly_chart(fig_sidebar, use_container_width=True)
             
             for a in acoes_com_proximo:
                 st.sidebar.caption(f"🗓️ **{a['ticker']}**: {a['proxima_data'].strftime('%d/%m/%Y')} ➔ **{a['income_proximo']:.2f} {a['moeda']}**")
         else:
-            st.sidebar.info("Nenhuma das tuas ações anunciou o próximo dividendo ainda.")
+            st.sidebar.info(t["no_upcoming"])
 
     # --- CONTEÚDO PRINCIPAL ---
-    st.title("💰 Meus Dividendos")
+    st.title(t["title"])
 
     # SECÇÃO: Adicionar Ação
-    st.subheader("➕ Adicionar Ação")
+    st.subheader(t["add_stock"])
     with st.form("add_stock_form", clear_on_submit=True):
-        conta_selecionada = st.selectbox("Escolha a Conta onde comprou:", user_data["contas"])
+        conta_selecionada = st.selectbox(t["choose_account"], user_data["contas"])
         
         col1, col2 = st.columns([2, 1])
         with col1:
-            ticker_input = st.text_input("Ticker (ex: PETR4, AAPL, EDP.LS):").upper().strip()
+            ticker_input = st.text_input(t["ticker_label"]).upper().strip()
         with col2:
-            qtd = st.number_input("Quantidade:", min_value=0.0001, step=0.1, value=1.0, format="%.4f")
+            qtd = st.number_input(t["quantity_label"], min_value=0.0001, step=0.1, value=1.0, format="%.4f")
 
-        submitted = st.form_submit_button("Guardar Ação")
+        submitted = st.form_submit_button(t["save_stock"])
 
         if submitted and ticker_input:
             if len(ticker_input) >= 5 and ticker_input[-1].isdigit() and not ticker_input.endswith(".SA"):
@@ -263,21 +391,21 @@ else:
                 })
 
             guardar_dados(dados_globais)
-            st.success(f"{ticker_final} atualizado na conta {conta_selecionada}!")
+            st.success(t["stock_updated"].format(ticker_final, conta_selecionada))
             st.rerun()
 
     # SECÇÃO: Exibição da Carteira
     if dados_graficos_globais:
         st.markdown("---")
-        st.subheader(f"📊 A tua Carteira ({filtro_conta})")
+        st.subheader(t["your_portfolio"].format(filtro_conta))
 
-        if filtro_conta == "Todas as Contas":
+        if filtro_conta == t["all_accounts"]:
             dados_filtrados = dados_graficos_globais
         else:
             dados_filtrados = [item for item in dados_graficos_globais if item["conta"] == filtro_conta]
 
         if not dados_filtrados:
-            st.info(f"Nenhuma ação registada em '{filtro_conta}'.")
+            st.info(t["no_stocks_account"].format(filtro_conta))
         else:
             col_grafico, col_lista = st.columns([0.8, 1.2])
 
@@ -303,7 +431,7 @@ else:
                 fig.update_layout(
                     height=280,
                     annotations=[{
-                        "text": f"<b>Total</b><br>{total_patrimonio:.2f} {moeda_pred}",
+                        "text": f"<b>{t['total']}</b><br>{total_patrimonio:.2f} {moeda_pred}",
                         "x": 0.5, "y": 0.5, "font_size": 15, "showarrow": False
                     }],
                     showlegend=False,
@@ -314,40 +442,40 @@ else:
             with col_lista:
                 for acao in dados_filtrados:
                     st.markdown(f"### {acao['nome']} (`{acao['ticker']}`)")
-                    st.caption(f"🏦 **Conta:** {acao['conta']}")
-                    st.write(f"**Quantidade:** {acao['quantidade']:.4f} ações | **Preço:** {acao['preco']:.2f} {acao['moeda']}")
+                    st.caption(f"🏦 **{t['account']}** {acao['conta']}")
+                    st.write(f"**{t['quantity']}** {acao['quantidade']:.4f} {t['shares']} | **{t['price']}** {acao['preco']:.2f} {acao['moeda']}")
 
                     if acao['proxima_data']:
                         total_a_receber = acao['income_proximo']
-                        st.info(f"🔮 **Próximo Dividendo:** Ex-Dividendo em {acao['proxima_data'].strftime('%d/%m/%Y')} ➔ **Vais receber:** {total_a_receber:.2f} {acao['moeda']}")
+                        st.info(t["next_div"].format(acao['proxima_data'].strftime('%d/%m/%Y'), total_a_receber, acao['moeda']))
                     else:
-                        st.caption("ℹ️ *Próximo dividendo ainda não foi anunciado.*")
+                        st.caption(t["next_div_not_announced"])
 
                     if acao['ultimo_div_val'] > 0:
-                        st.write(f"⏮️ **Último dividendo pago:** {acao['ultimo_div_val']:.4f} {acao['moeda']}/ação ({acao['ultimo_div_data']})")
+                        st.write(t["last_div"].format(acao['ultimo_div_val'], acao['moeda'], acao['ultimo_div_data']))
                     else:
-                        st.write("⏮️ **Último dividendo pago:** Sem histórico recente.")
+                        st.write(t["last_div_none"])
 
                     st.markdown("---")
 
         # Botão Limpar Carteira
         if not st.session_state.confirmar_limpar_tudo:
-            if st.button("🗑️ Limpar Toda a Carteira"):
+            if st.button(t["clear_portfolio"]):
                 st.session_state.confirmar_limpar_tudo = True
                 st.rerun()
         else:
-            st.warning("⚠️ **Tem a certeza absoluta de que quer APAGAR TODAS as ações da carteira?**")
+            st.warning(t["clear_confirm_q"])
             col_sim, col_nao = st.columns(2)
             with col_sim:
-                if st.button("✔️ Sim, Apagar Tudo"):
+                if st.button(t["yes_clear"]):
                     user_data["carteira"] = []
                     guardar_dados(dados_globais)
                     st.session_state.confirmar_limpar_tudo = False
-                    st.success("Carteira limpa com sucesso!")
+                    st.success(t["portfolio_cleared"])
                     st.rerun()
             with col_nao:
-                if st.button("❌ Cancelar"):
+                if st.button(t["cancel"]):
                     st.session_state.confirmar_limpar_tudo = False
                     st.rerun()
     else:
-        st.info("Adiciona uma ação acima para veres os teus dividendos.")
+        st.info(t["add_stock_info"])
