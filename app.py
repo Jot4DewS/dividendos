@@ -15,6 +15,22 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Custom CSS para estilo dos botões
+st.markdown("""
+<style>
+    div.stButton > button[key="btn_add_action_popup"] {
+        background-color: #2e7d32 !important;
+        color: white !important;
+        border: none !important;
+        font-weight: bold !important;
+    }
+    div.stButton > button[key="btn_add_action_popup"]:hover {
+        background-color: #388e3c !important;
+        color: white !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 FICHEIRO_DADOS = "dados_app.json"
 
 # --- DICIONÁRIO DE TRADUÇÃO (PT / EN) ---
@@ -57,14 +73,18 @@ TEXTS = {
         "choose_account": "Escolha a Conta onde comprou:",
         "ticker_label": "Ticker (ex: PETR4, AAPL, EDP.LS):",
         "quantity_label": "Quantidade:",
+        "price_label": "Preço de Compra por Ação (0 = usar preço atual):",
         "save_stock": "Guardar Ação",
         "stock_updated": "{} atualizado na conta {}!",
         "your_portfolio": "📊 A tua Carteira ({})",
         "no_stocks_account": "Nenhuma ação registada em '{}'.",
-        "total": "Total",
+        "total": "Total Atual",
         "quantity": "Quantidade:",
         "shares": "ações",
-        "price": "Preço:",
+        "price": "Preço Atual:",
+        "avg_price": "Preço Médio Compra:",
+        "total_invested": "Total Investido:",
+        "profit_loss": "Lucro / Prejuízo:",
         "account": "Conta:",
         "next_div": "🔮 **Próximo Dividendo:** Ex-Dividendo em {} ➔ **Vais receber:** {:.2f} {}",
         "next_div_not_announced": "ℹ️ *Próximo dividendo ainda não foi anunciado.*",
@@ -123,14 +143,18 @@ TEXTS = {
         "choose_account": "Choose the Account:",
         "ticker_label": "Ticker (e.g., PETR4, AAPL, EDP.LS):",
         "quantity_label": "Quantity:",
+        "price_label": "Buy Price per Share (0 = use current price):",
         "save_stock": "Save Stock",
         "stock_updated": "{} updated in account {}!",
         "your_portfolio": "📊 Your Portfolio ({})",
         "no_stocks_account": "No stocks registered in '{}'.",
-        "total": "Total",
+        "total": "Current Total",
         "quantity": "Quantity:",
         "shares": "shares",
-        "price": "Price:",
+        "price": "Current Price:",
+        "avg_price": "Avg Buy Price:",
+        "total_invested": "Total Invested:",
+        "profit_loss": "Profit / Loss:",
         "account": "Account:",
         "next_div": "🔮 **Next Dividend:** Ex-Dividend on {} ➔ **You will receive:** {:.2f} {}",
         "next_div_not_announced": "ℹ️ *Next dividend not announced yet.*",
@@ -240,8 +264,13 @@ else:
         with st.form("add_stock_modal_form", clear_on_submit=True):
             conta_selecionada = st.selectbox(t["choose_account"], user_data["contas"])
             ticker_input = st.text_input(t["ticker_label"]).upper().strip()
-            qtd = st.number_input(t["quantity_label"], min_value=0.0001, step=0.1, value=1.0, format="%.4f")
             
+            c_qtd, c_prc = st.columns(2)
+            with c_qtd:
+                qtd = st.number_input(t["quantity_label"], min_value=0.0001, step=0.1, value=1.0, format="%.4f")
+            with c_prc:
+                preco_compra = st.number_input(t["price_label"], min_value=0.0, step=0.5, value=0.0, format="%.2f")
+
             submitted = st.form_submit_button(t["save_stock"], use_container_width=True)
 
             if submitted and ticker_input:
@@ -253,7 +282,18 @@ else:
                 encontrado = False
                 for item in user_data["carteira"]:
                     if item["ticker"] == ticker_final and item["conta"] == conta_selecionada:
-                        item["quantidade"] += float(qtd)
+                        # Recalcular Preço Médio Ponderado
+                        qtd_antiga = item.get("quantidade", 0)
+                        prc_antigo = item.get("preco_compra", 0)
+                        
+                        nova_qtd_total = qtd_antiga + float(qtd)
+                        if prc_antigo > 0 or preco_compra > 0:
+                            novo_prc_medio = ((qtd_antiga * prc_antigo) + (float(qtd) * preco_compra)) / nova_qtd_total
+                        else:
+                            novo_prc_medio = 0.0
+
+                        item["quantidade"] = nova_qtd_total
+                        item["preco_compra"] = novo_prc_medio
                         encontrado = True
                         break
 
@@ -261,7 +301,8 @@ else:
                     user_data["carteira"].append({
                         "conta": conta_selecionada,
                         "ticker": ticker_final,
-                        "quantidade": float(qtd)
+                        "quantidade": float(qtd),
+                        "preco_compra": float(preco_compra)
                     })
 
                 guardar_dados(dados_globais)
@@ -278,6 +319,7 @@ else:
         simbolo = item["ticker"]
         quantidade = item["quantidade"]
         conta = item["conta"]
+        preco_compra = item.get("preco_compra", 0.0)
 
         try:
             stock = yf.Ticker(simbolo)
@@ -285,7 +327,12 @@ else:
             nome = info.get("shortName", simbolo)
             moeda = info.get("currency", "USD")
             price = info.get("previousClose", 0) or info.get("currentPrice", 0)
-            valor_total = price * quantidade
+            
+            # Se não definiu preço de compra, assume o preço de mercado atual como preço médio
+            prc_medio_utilizado = preco_compra if preco_compra > 0 else price
+            total_investido = prc_medio_utilizado * quantidade
+            valor_total_atual = price * quantidade
+            ganho_perda = valor_total_atual - total_investido
 
             # Obter último dividendo pago
             div_history = stock.dividends
@@ -323,7 +370,10 @@ else:
                 "conta": conta,
                 "quantidade": quantidade,
                 "preco": price,
-                "valor_total": valor_total,
+                "preco_compra": prc_medio_utilizado,
+                "total_investido": total_investido,
+                "valor_total": valor_total_atual,
+                "ganho_perda": ganho_perda,
                 "moeda": moeda,
                 "proxima_data": proxima_data,
                 "proximo_div_val": proximo_div_val,
@@ -359,24 +409,31 @@ else:
                     col_ticker = next((c for c in df_csv.columns if "ticker" in c.lower() or "symbol" in c.lower() or "ação" in c.lower()), None)
                     col_shares = next((c for c in df_csv.columns if "shares" in c.lower() or "qty" in c.lower() or "qtd" in c.lower() or "quantidade" in c.lower()), None)
                     col_action = next((c for c in df_csv.columns if "action" in c.lower() or "tipo" in c.lower() or "operação" in c.lower()), None)
+                    col_price = next((c for c in df_csv.columns if "price" in c.lower() or "preço" in c.lower() or "ppr" in c.lower()), None)
 
                     if col_ticker and col_shares:
                         for _, row in df_csv.iterrows():
                             tkr = str(row[col_ticker]).strip().upper()
                             try:
                                 shs = float(row[col_shares])
+                                prc = float(row[col_price]) if col_price else 0.0
                             except Exception:
                                 continue
 
                             act = str(row[col_action]).strip().lower() if col_action else "buy"
 
+                            if tkr not in compras_vendas:
+                                compras_vendas[tkr] = {"qty": 0.0, "total_cost": 0.0}
+
                             if "sell" in act or "venda" in act:
-                                compras_vendas[tkr] = compras_vendas.get(tkr, 0.0) - shs
+                                compras_vendas[tkr]["qty"] -= shs
                             else:
-                                compras_vendas[tkr] = compras_vendas.get(tkr, 0.0) + shs
+                                compras_vendas[tkr]["qty"] += shs
+                                compras_vendas[tkr]["total_cost"] += (shs * prc)
 
                         count_import = 0
-                        for tkr, qty in compras_vendas.items():
+                        for tkr, data in compras_vendas.items():
+                            qty = data["qty"]
                             if qty > 0:
                                 count_import += 1
                                 if len(tkr) >= 5 and tkr[-1].isdigit() and not tkr.endswith(".SA"):
@@ -384,17 +441,21 @@ else:
                                 else:
                                     tkr_final = tkr
 
+                                prc_medio = data["total_cost"] / qty if data["total_cost"] > 0 else 0.0
+
                                 encontrado = False
                                 for item in user_data["carteira"]:
                                     if item["ticker"] == tkr_final and item["conta"] == conta_dest_csv:
                                         item["quantidade"] = qty
+                                        item["preco_compra"] = prc_medio
                                         encontrado = True
                                         break
                                 if not encontrado:
                                     user_data["carteira"].append({
                                         "conta": conta_dest_csv,
                                         "ticker": tkr_final,
-                                        "quantidade": qty
+                                        "quantidade": qty,
+                                        "preco_compra": prc_medio
                                     })
 
                         guardar_dados(dados_globais)
@@ -485,7 +546,7 @@ else:
 
         if not dados_filtrados:
             st.info(t["no_stocks_account"].format(filtro_conta))
-            if st.button(t["add_stock"], type="primary"):
+            if st.button(t["add_stock"], key="btn_add_action_popup"):
                 modal_adicionar_acao()
         else:
             col_grafico, col_lista = st.columns([0.8, 1.2])
@@ -493,6 +554,7 @@ else:
             with col_grafico:
                 df_grafico = pd.DataFrame(dados_filtrados)
                 total_patrimonio = df_grafico["valor_total"].sum()
+                total_investido_geral = df_grafico["total_investido"].sum()
                 moeda_pred = df_grafico["moeda"].iloc[0] if not df_grafico.empty else "USD"
 
                 fig = px.pie(
@@ -520,8 +582,10 @@ else:
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
-                # BOTÃO PARA ADICIONAR AÇÃO COLOCADO DEBAIXO DO GRÁFICO
-                if st.button(t["add_stock"], type="primary", use_container_width=True):
+                st.caption(f"💵 **{t['total_invested']}** {total_investido_geral:.2f} {moeda_pred}")
+
+                # BOTÃO PARA ADICIONAR AÇÃO COM COR VERDE AJUSTADA
+                if st.button(t["add_stock"], key="btn_add_action_popup", use_container_width=True):
                     modal_adicionar_acao()
 
             with col_lista:
@@ -555,6 +619,11 @@ else:
 
                     st.caption(f"🏦 **{t['account']}** {acao['conta']}")
                     st.write(f"**{t['quantity']}** {acao['quantidade']:.4f} {t['shares']} | **{t['price']}** {acao['preco']:.2f} {acao['moeda']}")
+                    
+                    if acao['preco_compra'] > 0:
+                        cor_lucro = "green" if acao['ganho_perda'] >= 0 else "red"
+                        st.write(f"**{t['avg_price']}** {acao['preco_compra']:.2f} {acao['moeda']} | **{t['total_invested']}** {acao['total_invested']:.2f} {acao['moeda']}")
+                        st.markdown(f"**{t['profit_loss']}** <span style='color:{cor_lucro}; font-weight:bold;'>{acao['ganho_perda']:+.2f} {acao['moeda']}</span>", unsafe_allow_html=True)
 
                     if acao['proxima_data']:
                         total_a_receber = acao['income_proximo']
@@ -590,5 +659,5 @@ else:
                     st.rerun()
     else:
         st.info(t["add_stock_info"])
-        if st.button(t["add_stock"], type="primary"):
+        if st.button(t["add_stock"], key="btn_add_action_popup"):
             modal_adicionar_acao()
